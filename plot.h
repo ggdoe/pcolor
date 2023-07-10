@@ -3,24 +3,56 @@
 #include <float.h>
 
 #define COLOR_OUT 0xFFFFFFFF
+#define COLOR(r,g,b) (0xFF<<24 | r<<16 | g<<8 | b)
 
-void plot(uint32_t *pixels, int width, int height, double *data, uint32_t nb_elem, uint32_t color)
+struct lim{
+    double min;
+    double max;
+};
+
+struct lim compute_lim(const double *data, uint32_t nb_elem, const struct lim *old_lim)
 {
-    double min = data[0], max = data[0];
-    for(uint32_t k=0; k < nb_elem; k++){
-        min = (min < data[k]) ? min : data[k];
-        max = (max > data[k]) ? max : data[k];
+    struct lim lim;
+    if(old_lim != NULL)
+        lim = *old_lim;
+    else{
+        lim.min = data[0];
+        lim.max = data[0];
     }
 
-    // memset(pixels, COLOR_OUT, width * height * sizeof(uint32_t));
-
-    // padding
-    {
-        double diff = (max - min);
-        min -= 0.1 * diff;
-        max += 0.1 * diff;
+    for(uint32_t k=1; k < nb_elem; k++){
+        lim.min = (lim.min < data[k]) ? lim.min : data[k];
+        lim.max = (lim.max > data[k]) ? lim.max : data[k];
     }
 
+    return lim;
+}
+
+void fill(uint32_t *pixels, int width, int height, uint8_t red, uint8_t green, uint8_t blue)
+{
+    uint32_t color = 0xFF000000 | red<<16 | green<<8 | blue;
+    memset(pixels, color, width * height * sizeof(uint32_t));
+}
+
+void plot(uint32_t *pixels, int width, int height, double *data, uint32_t nb_elem, struct lim *ylim, uint32_t color)
+{
+    double min, max;
+    if(ylim == NULL){
+        struct lim lim = compute_lim(data, nb_elem, NULL);
+        min = lim.min;
+        max = lim.max;
+    }
+    else {
+        min = ylim->min;
+        max = ylim->max;
+    }
+    
+    // const double padding = 0.02; // doesnt work with grid()
+    // {
+    //     double diff = (max - min);
+    //     min -= padding * diff;
+    //     max += padding * diff;
+    // }
 
     int i = 0;
     int j = (height - 1) * (1.0 - (data[0] - min) / (max - min));
@@ -47,4 +79,47 @@ void plot(uint32_t *pixels, int width, int height, double *data, uint32_t nb_ele
         i = new_i;
         j = new_j;
     }
+}
+
+void grid(uint32_t *pixels, int width, int height, struct lim *xlim, struct lim *ylim, uint32_t color)
+{
+    const uint32_t axis_color = 0xFF000000;
+    double diff_x, dx;
+    double diff_y, dy;
+
+    {
+        const double count = 10.0;
+        const double count_x = (width <= height) ? count : count * (double)width/(double)height;
+        const double count_y = (width >= height) ? count : count * (double)height/(double)width;
+        diff_x = xlim->max - xlim->min;
+        diff_y = ylim->max - ylim->min;
+        dx = diff_x/count_x;
+        dy = diff_y/count_y;
+    }
+    printf("  [grid]\tdx: %lf\tdy: %lf\n", dx, dy);
+
+    // grid
+    for(double x = ceil(xlim->min/dx)*dx; x < xlim->max; x+=dx){
+        uint32_t i = width * (x - xlim->min) / diff_x;
+        for(uint32_t j = 0; j < height; j++)
+            pixels[j * width + i] = color;
+    }
+    for(double y = ceil(ylim->min/dy)*dy; y < ylim->max; y+=dy){
+        uint32_t j = height * (y - ylim->min) / diff_y;
+        for(uint32_t i = 0; i < width; i++)
+            pixels[j * width + i] = color;
+    }
+
+    // axis
+    if(xlim->min <= 0.0 && xlim->max >= 0.0){
+        uint32_t i = width * (0.0 - xlim->min) / diff_x;
+        for(uint32_t j = 0; j < height; j++)
+            pixels[j * width + i] = axis_color;
+    }
+    if(ylim->min <= 0.0 && ylim->max >= 0.0){
+        uint32_t j = height * (0.0 - ylim->min) / diff_y;
+        for(uint32_t i = 0; i < width; i++)
+            pixels[j * width + i] = axis_color;
+    }
+
 }

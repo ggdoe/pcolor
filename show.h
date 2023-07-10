@@ -2,10 +2,12 @@
 #include <stdbool.h>
 #include <SDL2/SDL.h>
 
+static bool initialized = false;
 SDL_Window * window;
 SDL_Renderer * renderer;
-SDL_Event event;
 
+static void init_window(int width, int height);
+static void close_window();
 
 inline static 
 void center_rect(SDL_Rect *rect, int pic_w, int pic_h, int center_x, int center_y, double zoom)
@@ -40,31 +42,28 @@ void center_rect(SDL_Rect *rect, int pic_w, int pic_h, int center_x, int center_
     SDL_RenderClear(renderer);
 }
 
-void init_window(int width, int height)
-{
-    SDL_Init(SDL_INIT_VIDEO);
-
-    window = SDL_CreateWindow("show",
-        SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN);
-    renderer = SDL_CreateRenderer(window, -1, 0);
-}
-
 void show(uint32_t *pixels, int width, int height)
 {
+    if(!initialized){
+        init_window(width, height);
+        initialized = true;
+    }
+    
     SDL_Rect render_rect;
     SDL_Texture *texture = SDL_CreateTexture(renderer,
             SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, width, height);
 
-    SDL_UpdateTexture(texture, NULL, pixels, width * sizeof(uint32_t));
-
     int center_x = 0;
     int center_y = 0;
     double zoom = 1.0;
+    const double zoom_factor = 1.1;
 
     center_rect(&render_rect, width, height, center_x, center_y, zoom);
+    SDL_UpdateTexture(texture, NULL, pixels, width * sizeof(uint32_t));
     SDL_RenderCopy(renderer, texture, NULL, &render_rect);
     SDL_RenderPresent(renderer);
 
+    SDL_Event event;
     while(SDL_WaitEvent(&event)){
         bool redraw = false;
         switch (event.type)
@@ -85,16 +84,20 @@ void show(uint32_t *pixels, int width, int height)
                 }
                 break;
             case SDL_MOUSEWHEEL:
-                zoom *= (event.wheel.y > 0) ? 1.1 : 1/1.1;
+                zoom *= (event.wheel.y > 0) ? zoom_factor : 1.0/zoom_factor;
                 redraw = true;
                 break;
             case SDL_KEYDOWN:
-                if(event.key.keysym.sym == SDLK_r)
+                switch(event.key.keysym.sym)
                 {
-                    center_x = 0;
-                    center_y = 0;
-                    zoom = 1.0;
-                    redraw = true;
+                    case SDLK_r:
+                        center_x = 0;
+                        center_y = 0;
+                        zoom = 1.0;
+                        redraw = true;
+                        break;
+                    case SDLK_q:
+                        goto quit;
                 }
                 break;
         }
@@ -110,7 +113,18 @@ void show(uint32_t *pixels, int width, int height)
     SDL_DestroyTexture(texture);
 }
 
-void close_window()
+static void init_window(int width, int height)
+{
+    SDL_Init(SDL_INIT_VIDEO);
+
+    window = SDL_CreateWindow("show",
+        SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN);
+    renderer = SDL_CreateRenderer(window, -1, 0);
+
+    atexit(close_window);
+}
+
+static void close_window()
 {
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
