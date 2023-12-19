@@ -65,12 +65,10 @@ void plot(uint32_t *pixels, int width, int height, double *data, uint32_t nb_ele
         int jmin = (j < new_j) ? j : new_j;
         int jmax = (j > new_j) ? j : new_j;
 
-        // if(jmax - jmin > new_i - i)
             for(int jj=jmin; jj<jmax; jj++){
                 int ii = new_i + (i - new_i) * (new_j - jj)/(new_j - j);
                 pixels[jj * width + ii] = color;
             }
-        // else
             for(int ii=i; ii<new_i; ii++){
                 int jj = new_j + (j - new_j) * (new_i - ii)/(new_i - i);
                 pixels[jj * width + ii] = color;
@@ -88,15 +86,15 @@ void grid(uint32_t *pixels, int width, int height, struct lim *xlim, struct lim 
     double diff_y, dy;
 
     {
-        const double count = 10.0;
-        const double count_x = (width <= height) ? count : count * (double)width/(double)height;
-        const double count_y = (width >= height) ? count : count * (double)height/(double)width;
+        const double count = 4.0;
+        const double margin_factor = 1.3;
         diff_x = xlim->max - xlim->min;
         diff_y = ylim->max - ylim->min;
-        dx = diff_x/count_x;
-        dy = diff_y/count_y;
+        dx = pow(10, ceil(log10(margin_factor * diff_x) - 1.0))/count;
+        dy = pow(10, ceil(log10(margin_factor * diff_y) - 1.0))/count;
     }
-    printf("  [grid]\tdx: %lf\tdy: %lf\n", dx, dy);
+    printf("  [grid]  xmin: %lf  xmax: %lf\n", xlim->min, xlim->max);
+    printf("  [grid]  dx:   %lf    dy: %lf\n", dx, dy);
 
     // grid
     for(double x = ceil(xlim->min/dx)*dx; x < xlim->max; x+=dx){

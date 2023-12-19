@@ -10,15 +10,10 @@ static void init_window(int width, int height);
 static void close_window();
 
 inline static 
-void center_rect(SDL_Rect *rect, int pic_w, int pic_h, int center_x, int center_y, double zoom)
+void center_rect(SDL_Rect *rect, int pic_w, int pic_h)
 {
     int w, h;
     SDL_GetWindowSize(window, &w, &h);
-
-    // printf("w: %d\th: %d\tpw: %d\tph: %d\tcx: %d\tcy: %d\tzoom: %lf\n", w, h, pic_w, pic_h, center_x, center_y, zoom);
-
-    w *= zoom;
-    h *= zoom;
 
     if(w < h * pic_w / pic_h)
     {
@@ -34,12 +29,6 @@ void center_rect(SDL_Rect *rect, int pic_w, int pic_h, int center_x, int center_
         rect->w = h * pic_w / pic_h;
         rect->h = h;
     }
-
-    // TODO: centrer la cam quand on zoom
-    rect->x += center_x;
-    rect->y += center_y;
-
-    SDL_RenderClear(renderer);
 }
 
 void show(uint32_t *pixels, int width, int height)
@@ -49,21 +38,17 @@ void show(uint32_t *pixels, int width, int height)
         initialized = true;
     }
     
+    const double zoom_factor = 1.1;
+    SDL_Event event;
     SDL_Rect render_rect;
     SDL_Texture *texture = SDL_CreateTexture(renderer,
             SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, width, height);
 
-    int center_x = 0;
-    int center_y = 0;
-    double zoom = 1.0;
-    const double zoom_factor = 1.1;
-
-    center_rect(&render_rect, width, height, center_x, center_y, zoom);
+    center_rect(&render_rect, width, height);
     SDL_UpdateTexture(texture, NULL, pixels, width * sizeof(uint32_t));
     SDL_RenderCopy(renderer, texture, NULL, &render_rect);
     SDL_RenderPresent(renderer);
 
-    SDL_Event event;
     while(SDL_WaitEvent(&event)){
         bool redraw = false;
         switch (event.type)
@@ -72,28 +57,35 @@ void show(uint32_t *pixels, int width, int height)
                 goto quit;
             case SDL_WINDOWEVENT:
                 if(event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
+                {
+                    center_rect(&render_rect, width, height);
                     redraw = true;
+                }
                 break;
             case SDL_MOUSEBUTTONUP:
                 {
                     int w, h;
                     SDL_GetWindowSize(window, &w, &h);
-                    center_x += w/2 - event.button.x;
-                    center_y += h/2 - event.button.y;
+                    render_rect.x += w/2 - event.button.x;
+                    render_rect.y += h/2 - event.button.y;
                     redraw = true;
                 }
                 break;
             case SDL_MOUSEWHEEL:
-                zoom *= (event.wheel.y > 0) ? zoom_factor : 1.0/zoom_factor;
-                redraw = true;
+                {
+                    const double zoom = (event.wheel.y > 0) ? zoom_factor : 1.0/zoom_factor;
+                    render_rect.x += render_rect.w / 2 * (1-zoom);
+                    render_rect.y += render_rect.h / 2 * (1-zoom);
+                    render_rect.w *= zoom;
+                    render_rect.h *= zoom;
+                    redraw = true;
+                }
                 break;
             case SDL_KEYDOWN:
                 switch(event.key.keysym.sym)
                 {
                     case SDLK_r:
-                        center_x = 0;
-                        center_y = 0;
-                        zoom = 1.0;
+                        center_rect(&render_rect, width, height);
                         redraw = true;
                         break;
                     case SDLK_q:
@@ -103,7 +95,7 @@ void show(uint32_t *pixels, int width, int height)
         }
         if(redraw)
         {
-            center_rect(&render_rect, width, height, center_x, center_y, zoom);
+            SDL_RenderClear(renderer);
             SDL_RenderCopy(renderer, texture, NULL, &render_rect);
             SDL_RenderPresent(renderer);
         }

@@ -3,8 +3,9 @@
 SRC="./main.c"
 out_name="a.out"
 
-CFLAGS="-Wall -O3"
-LFLAGS="-fopenmp -flto"
+# CFLAGS="-Wall -O3"
+# LFLAGS="-fopenmp -flto"
+CFLAGS="-Wall -g"
 LIB="-lm -lSDL2"
 
 CC="gcc"
