@@ -94,6 +94,7 @@ void callback_dec_h(void *args)
 {
   struct callback_args *s = args;
   s->h-=5;
+  if(s->h < 2) s->h=2;
   s->map--;callback_cycle_mapping(args);
 }
 void callback_inc_w(void *args)
@@ -106,6 +107,7 @@ void callback_dec_w(void *args)
 {
   struct callback_args *s = args;
   s->w-=5;
+  if(s->w < 2) s->w=2;
   s->map--;callback_cycle_mapping(args);
 }
 
