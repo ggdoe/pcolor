@@ -2,8 +2,8 @@
 #include <string.h>
 #include <float.h>
 
-#define COLOR_OUT 0xFFFFFFFF
-#define COLOR(r,g,b) (0xFF<<24 | r<<16 | g<<8 | b)
+// #define COLOR_OUT 0xFFFFFFFF
+// #define COLOR(r,g,b) (0xFF<<24 | r<<16 | g<<8 | b)
 
 struct lim{
     double min;
@@ -79,9 +79,10 @@ void plot(uint32_t *pixels, int width, int height, double *data, uint32_t nb_ele
     }
 }
 
-void grid(uint32_t *pixels, int width, int height, struct lim *xlim, struct lim *ylim, uint32_t color)
+void fill_grid(uint32_t *pixels, int width, int height, struct lim *xlim, struct lim *ylim, uint32_t color)
 {
-    const uint32_t axis_color = 0xFF000000;
+    // globaly very bad
+    const uint32_t axis_color = 0xFF000000 | ~color;
     double diff_x, dx;
     double diff_y, dy;
 
@@ -93,8 +94,6 @@ void grid(uint32_t *pixels, int width, int height, struct lim *xlim, struct lim 
         dx = pow(10, ceil(log10(margin_factor * diff_x) - 1.0))/count;
         dy = pow(10, ceil(log10(margin_factor * diff_y) - 1.0))/count;
     }
-    printf("  [grid]  xmin: %lf  xmax: %lf\n", xlim->min, xlim->max);
-    printf("  [grid]  dx:   %lf    dy: %lf\n", dx, dy);
 
     // grid
     for(double x = ceil(xlim->min/dx)*dx; x < xlim->max; x+=dx){
