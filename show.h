@@ -1,3 +1,4 @@
+#pragma once
 #define SDL_MAIN_HANDLED
 #include <stdbool.h>
 #include <SDL2/SDL.h>
@@ -171,7 +172,7 @@ void draw_state(struct show_state *ss)
             ss->click_zone_max.y - ss->click_zone_min.y
         };
         
-        SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+        SDL_SetRenderDrawColor(renderer, 0xAA, 0xAA, 0xAA, 0xFF);
         SDL_RenderDrawRect(renderer, &long_click_zone);
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
     }
