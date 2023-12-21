@@ -121,8 +121,10 @@ void pcolor_fill_state(struct pcolor_state *state, double *x, double *y, int w_g
     const int w_pixels  = state->w_pixels;
     const int h_pixels  = state->h_pixels;
 
-    for (int i = 0; i < w_pixels * h_pixels; i++)
+    for (int i = 0; i < w_pixels * h_pixels; i++){
+        state->pixel_color_id[i] = 0;
         state->pixel_type[i] = PCOLOR_TYPE_OUTSIDE;
+    }
 
     const double xmin = _pcolor_min(x, w_grid*h_grid), ymin = _pcolor_min(y, w_grid*h_grid);
     const double xmax = _pcolor_max(x, w_grid*h_grid), ymax = _pcolor_max(y, w_grid*h_grid);
