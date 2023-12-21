@@ -7,7 +7,7 @@
 struct pcolor_state{
     int w_pixels;
     int h_pixels;
-    int ld_pixels; // configurable
+    int ld_pixels;
 
     uint32_t *pixels;
     uint32_t *pixel_color_id;
@@ -48,6 +48,22 @@ void draw_line(uint32_t *pixels, int w_pixels, int h_pixels, int i0, int j0, int
     }
 }
 
+bool is_inside_quad(int *iv, int *jv, int i, int j)
+{
+    bool sign  = (iv[0]-iv[3])*(j-jv[3]) > (jv[0]-jv[3])*(i-iv[3]);
+
+    for(int id = 0; id < 3; id++){
+        int i0 = iv[id], i1 = iv[id+1];
+        int j0 = jv[id], j1 = jv[id+1];
+
+        // idk, it works enough
+        if( (!sign && ((j-j0)*(i1-i0) > (i-i0)*(j1-j0))) ^
+            ( sign && ((j-j0)*(i1-i0) < (i-i0)*(j1-j0))) )
+            return false;
+    }
+    return true;
+}
+
 static double _pcolor_min(const double *x, int n)
 {
     double min = x[0];
@@ -62,7 +78,6 @@ static double _pcolor_max(const double *x, int n)
         max = (x[i] > max) ? x[i] : max;
     return max;
 }
-
 static int _pcolor_min_int(const int *x, int n)
 {
     int min = x[0];
@@ -76,21 +91,6 @@ static int _pcolor_max_int(const int *x, int n)
     for(int i = 1; i < n; i++)
         max = (x[i] > max) ? x[i] : max;
     return max;
-}
-
-bool is_inside_quad(int *iv, int *jv, int i, int j)
-{
-    // if sign is always the same --> point is inside
-    bool sign  = (iv[0]-iv[3])*(j-jv[3]) >= (jv[0]-jv[3])*(i-iv[3]);
-
-    for(int id = 0; id < 3; id++){
-        int i0 = iv[id], i1 = iv[id+1];
-        int j0 = jv[id], j1 = jv[id+1];
-
-        if( sign ^ ((j-j0)*(i1-i0) >= (i-i0)*(j1-j0)))
-            return false;
-    }
-    return true;
 }
 
 struct pcolor_state pcolor_state_alloc(uint32_t *pixels, int w_pixels, int h_pixels)
@@ -130,7 +130,7 @@ void pcolor_fill_state(struct pcolor_state *state, double *x, double *y, int w_g
     for (int i = 0; i < h_grid - 1; i++) {
         for (int j = 0; j < w_grid - 1; j++) {
 
-            // vertex of the cell
+            // vertex of the current cell
             int jv[] = {
                 (x[ i    * w_grid + j  ] - xmin) / (xmax - xmin) * (w_pixels-1), 
                 (x[ i    * w_grid + j+1] - xmin) / (xmax - xmin) * (w_pixels-1), 
@@ -150,21 +150,17 @@ void pcolor_fill_state(struct pcolor_state *state, double *x, double *y, int w_g
             int imin = _pcolor_min_int(iv, 4);
             int imax = _pcolor_max_int(iv, 4);
 
-
             for(int id = imin; id <= imax; id++)
                 for(int jd = jmin; jd <= jmax; jd++)
                     if(is_inside_quad(iv, jv, id, jd)){
                         state->pixel_type[id * w_pixels + jd] = PCOLOR_TYPE_CELL;
                         state->pixel_color_id[id * w_pixels + jd] = i * (w_grid-1) + j;
                     }
-            draw_line(state->pixel_color_id, w_pixels, h_pixels, iv[0], jv[0], iv[1], jv[1], i * (w_grid-1) + j);
-            draw_line(state->pixel_color_id, w_pixels, h_pixels, iv[0], jv[0], iv[3], jv[3], i * (w_grid-1) + j);
-            
+
             draw_line(state->pixel_type, w_pixels, h_pixels, iv[0], jv[0], iv[1], jv[1], PCOLOR_TYPE_EDGE);
             draw_line(state->pixel_type, w_pixels, h_pixels, iv[0], jv[0], iv[3], jv[3], PCOLOR_TYPE_EDGE);
             draw_line(state->pixel_type, w_pixels, h_pixels, iv[3], jv[3], iv[2], jv[2], PCOLOR_TYPE_EDGE);
             draw_line(state->pixel_type, w_pixels, h_pixels, iv[1], jv[1], iv[2], jv[2], PCOLOR_TYPE_EDGE);
-
         }
     }
 }
@@ -195,9 +191,8 @@ void pcolor_nostate(uint32_t *pixels, int w_pixels, int h_pixels, double *x, dou
     for (int i = 0; i < w_pixels * h_pixels; i++)
         pixels[i] = color_outside;
 
-    const double margin = 0.0;
-    const double xmin = _pcolor_min(x, w_grid*h_grid) - margin, ymin = _pcolor_min(y, w_grid*h_grid) - margin;
-    const double xmax = _pcolor_max(x, w_grid*h_grid) + margin, ymax = _pcolor_max(y, w_grid*h_grid) + margin;
+    const double xmin = _pcolor_min(x, w_grid*h_grid), ymin = _pcolor_min(y, w_grid*h_grid);
+    const double xmax = _pcolor_max(x, w_grid*h_grid), ymax = _pcolor_max(y, w_grid*h_grid);
 
     for (int i = 0; i < h_grid - 1; i++) {
         for (int j = 0; j < w_grid - 1; j++) {

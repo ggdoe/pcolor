@@ -48,8 +48,6 @@ int main(int argc, char **argv)
 
   pcolor(&pstate, C);
   
-  // pcolor_nostate(pixels, IMG_WIDTH, IMG_HEIGHT, x, y, w, h, C, true, 0xFFFFFFFF, 0xFF111111);
-
   show(pixels, IMG_WIDTH, IMG_HEIGHT);
 
   free(pixels);

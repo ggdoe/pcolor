@@ -109,7 +109,7 @@ void manage_event(struct show_state *ss)
 
                     int new_center_x =  ((ss->click_zone_min.x + ss->click_zone_max.x)/2 - ss->render_rect.x) / ss->zoom;
                     int new_center_y =  ((ss->click_zone_min.y + ss->click_zone_max.y)/2 - ss->render_rect.y) / ss->zoom;
-                    const double limit_zoom = 10.0;
+                    const double limit_zoom = 20.0;
                     if(new_zoom < limit_zoom)
                         ss->zoom *= new_zoom;
 
