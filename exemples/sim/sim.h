@@ -67,8 +67,10 @@ struct sim{
   struct grid grid;
   struct cstate cstate;
   struct pstate pstate;
-  struct pstate slope;
-  struct cstate fluxe;
+  struct pstate slope_x;
+  struct pstate slope_y;
+  struct cstate flux_x;
+  struct cstate flux_y;
   real_t gamma;
   real_t cfl;
   real_t t;
@@ -92,7 +94,7 @@ void prim_to_cons(struct sim *sim)
 {
   DECLARE_STATES_VAR
 
-  #pragma omp parallel for
+  //#pragma omp parallel for
   for_each_cells_and_ghost_y(i)
     for_each_cells_and_ghost_x(j)
     {
@@ -109,7 +111,7 @@ void cons_to_prim(struct sim *sim)
 {
   DECLARE_STATES_VAR
 
-  #pragma omp parallel for
+  //#pragma omp parallel for
   for_each_cells_and_ghost_y(i)
     for_each_cells_and_ghost_x(j)
     {
@@ -207,13 +209,15 @@ struct sim init_sim(u32 Nx, u32 Ny)
   const u32 gx = 2, gy = 2;
   sim.grid = init_grid(Nx, Ny, gx, gy);
   sim.gamma = 1.4;
-  sim.cfl = 0.02;
+  sim.cfl = 0.2;
   sim.t = 0.0;
 
   alloc_state(&sim.cstate, sim.grid.Nx_tot * sim.grid.Ny_tot);
   alloc_state(&sim.pstate, sim.grid.Nx_tot * sim.grid.Ny_tot);
-  alloc_state(&sim.slope,  sim.grid.Nx_tot * sim.grid.Ny_tot);
-  alloc_state(&sim.fluxe,  sim.grid.Nx_tot * sim.grid.Ny_tot);
+  alloc_state(&sim.slope_x,  sim.grid.Nx_tot * sim.grid.Ny_tot);
+  alloc_state(&sim.slope_y,  sim.grid.Nx_tot * sim.grid.Ny_tot);
+  alloc_state(&sim.flux_x, sim.grid.Nx_tot * sim.grid.Ny_tot);
+  alloc_state(&sim.flux_y, sim.grid.Nx_tot * sim.grid.Ny_tot);
 
   return sim;
 }
@@ -235,8 +239,10 @@ void free_sim(struct sim *sim)
   free(sim->grid.vertex_y);
   free_state(&sim->cstate);
   free_state(&sim->pstate);
-  free_state(&sim->slope);
-  free_state(&sim->fluxe);
+  free_state(&sim->slope_x);
+  free_state(&sim->slope_y);
+  free_state(&sim->flux_x);
+  free_state(&sim->flux_y);
 }
 
 real_t compute_dt(struct sim *sim)
@@ -247,7 +253,7 @@ real_t compute_dt(struct sim *sim)
   const double dy = sim->grid.dy;
   const double gamma = sim->gamma;
 
-  #pragma omp parallel for reduction(min:inv_dt)
+  //#pragma omp parallel for reduction(min:inv_dt)
   for_each_cells_y(i)
     for_each_cells_x(j)
     {
@@ -340,9 +346,9 @@ real_t minmod(real_t a, real_t b)
     return (a * b < 0.0) ? 0.0 : (fabs(a) < fabs(b)) ? a : b;
 }
 
-real_t limited_slope(real_t *q, u64 id)
+real_t limited_slope(real_t *q, u64 id, const u64 off)
 {
-  return minmod(q[id] - q[id-1], q[id+1] - q[id]);
+  return minmod(q[id] - q[id-off], q[id+off] - q[id]);
 }
 
 struct interface_values{
@@ -350,22 +356,24 @@ struct interface_values{
   struct pcell right;
 };
 
-struct interface_values get_interface_values(struct sim *sim, u64 id, int dir)
+struct interface_values get_interface_values(struct sim *sim, u64 id, enum dir dir)
 {
   DECLARE_PSTATE_VAR
+  struct pstate *slope = (dir == IX) ? &sim->slope_x : &sim->slope_y;
+  const u64        off = (dir == IX) ? 1 : sim->grid.Nx_tot;
 
   struct interface_values iv = {
     .left = {
-      .rho = rho[id]   + 0.5 * sim->slope.rho[id],
-      .u   = u  [id]   + 0.5 * sim->slope.u  [id],
-      .v   = v  [id]   + 0.5 * sim->slope.v  [id],
-      .p   = p  [id]   + 0.5 * sim->slope.p  [id]
+      .rho = rho[id]     + 0.5 * slope->rho[id],
+      .u   = u  [id]     + 0.5 * slope->u  [id],
+      .v   = v  [id]     + 0.5 * slope->v  [id],
+      .p   = p  [id]     + 0.5 * slope->p  [id]
     },
     .right = {
-      .rho = rho[id+1] - 0.5 * sim->slope.rho[id+1],
-      .u   = u  [id+1] - 0.5 * sim->slope.u  [id+1],
-      .v   = v  [id+1] - 0.5 * sim->slope.v  [id+1],
-      .p   = p  [id+1] - 0.5 * sim->slope.p  [id+1]
+      .rho = rho[id+off] - 0.5 * slope->rho[id+off],
+      .u   = u  [id+off] - 0.5 * slope->u  [id+off],
+      .v   = v  [id+off] - 0.5 * slope->v  [id+off],
+      .p   = p  [id+off] - 0.5 * slope->p  [id+off]
     }
   };
   
@@ -374,58 +382,135 @@ struct interface_values get_interface_values(struct sim *sim, u64 id, int dir)
 
 void compute_slope(struct sim *sim)
 {
-  #pragma omp parallel for
-  for_each_cells(i){
-    sim->slope.rho[i] = limited_slope(sim->pstate.rho, i);
-    sim->slope.u[i]   = limited_slope(sim->pstate.u, i);
-    sim->slope.p[i]   = limited_slope(sim->pstate.p, i);
-  }
+  DECLARE_PSTATE_VAR
+  const u64 offset_x = 1;
+  const u64 offset_y = sim->grid.Nx_tot;
+
+  //#pragma omp parallel for
+  for_each_cells_y(i)
+    for_each_cells_x(j){
+      const u64 id = cell_id(i,j);
+      // x-dir
+      sim->slope_x.rho[id] = limited_slope(rho, id, offset_x);
+      sim->slope_x.  u[id] = limited_slope(  u, id, offset_x);
+      sim->slope_x.  v[id] = limited_slope(  v, id, offset_x);
+      sim->slope_x.  p[id] = limited_slope(  p, id, offset_x);
+
+      // y-dir
+      sim->slope_y.rho[id] = limited_slope(rho, id, offset_y);
+      sim->slope_y.  u[id] = limited_slope(  u, id, offset_y);
+      sim->slope_y.  v[id] = limited_slope(  v, id, offset_y);
+      sim->slope_y.  p[id] = limited_slope(  p, id, offset_y);
+    }
 }
 
-void compute_fluxes(struct sim *sim)
+void swap_uv(void* state)
 {
-  #pragma omp parallel for
-  for_each_interfaces(i)
-  {
-    struct interface_values iv = get_interface_values(sim, i);
-    struct fcell flux = riemann_hllc(&iv.left, &iv.right, sim->gamma);
+  struct pcell *s = state;
+  real_t swap = s->u;
+  s->u = s->v;
+  s->v = swap;
+}
 
-    sim->fluxe.rho  [i] = flux.rho;
-    sim->fluxe.rho_u[i] = flux.rho_u;
-    sim->fluxe.E    [i] = flux.E;
-  }
+void compute_fluxes(struct sim *sim, enum dir dir)
+{
+  struct cstate *flux = (dir == IX) ? &sim->flux_x : &sim->flux_y;
+
+  //#pragma omp parallel for
+  for_each_interfaces_y(i)
+    for_each_interfaces_x(j)
+    {
+      const u64 id = cell_id(i,j);
+      struct interface_values iv = get_interface_values(sim, id, dir);
+      if(dir == IY){
+        swap_uv(&iv.left);
+        swap_uv(&iv.right);
+      }
+
+      struct fcell riemannflux = riemann_hllc(&iv.left, &iv.right, sim->gamma);
+      if(dir == IY)
+        swap_uv(&riemannflux);
+        
+      flux->rho  [id] = riemannflux.rho;
+      flux->rho_u[id] = riemannflux.rho_u;
+      flux->rho_v[id] = riemannflux.rho_v;
+      flux->E    [id] = riemannflux.E;
+    }
 }
 
 void cells_update(struct sim *sim, real_t dt)
 {
+  DECLARE_CSTATE_VAR
   const real_t dtdx = dt / sim->grid.dx;
+  const real_t dtdy = dt / sim->grid.dy;
+  const u64 off_x = 1;
+  const u64 off_y = sim->grid.Nx_tot;
+  struct cstate *flux_x = &sim->flux_x;
+  struct cstate *flux_y = &sim->flux_y;
 
-  #pragma omp parallel for
-  for_each_cells(i)
-  {
-    sim->cstate.rho  [i] += dtdx * (sim->fluxe.rho  [i-1] - sim->fluxe.rho  [i]);
-    sim->cstate.rho_u[i] += dtdx * (sim->fluxe.rho_u[i-1] - sim->fluxe.rho_u[i]);
-    sim->cstate.E    [i] += dtdx * (sim->fluxe.E    [i-1] - sim->fluxe.E    [i]);
+  //#pragma omp parallel for
+  for_each_cells_y(i)
+    for_each_cells_x(j){
+      const u64 id = cell_id(i,j);
+      rho  [id] += dtdx * (flux_x->rho  [id-off_x] - flux_x->rho  [id])
+                 + dtdy * (flux_y->rho  [id-off_y] - flux_y->rho  [id]);
+      rho_u[id] += dtdx * (flux_x->rho_u[id-off_x] - flux_x->rho_u[id])
+                 + dtdy * (flux_y->rho_u[id-off_y] - flux_y->rho_u[id]);
+      rho_v[id] += dtdx * (flux_x->rho_v[id-off_x] - flux_x->rho_v[id])
+                 + dtdy * (flux_y->rho_v[id-off_y] - flux_y->rho_v[id]);
+      E    [id] += dtdx * (flux_x->E    [id-off_x] - flux_x->E    [id])
+                 + dtdy * (flux_y->E    [id-off_y] - flux_y->E    [id]);
   }
 }
 
-void fill_boundaries_absorbing(struct sim *sim)
+void fill_boundaries_absorbing(struct sim *sim, enum dir dir)
 {
-  const u64 lo = sim->grid.gx;
-  const u64 hi = sim->grid.Nx_tot - sim->grid.gx;
+  DECLARE_CSTATE_VAR
+  u64 imaxl, jmaxl, lo;
+  u64 iminr, imaxr, jminr, jmaxr, hi;
+  if(dir == IX){
+    imaxl = sim->grid.Ny_tot;
+    jmaxl = sim->grid.gx;
+    iminr = 0;
+    imaxr = sim->grid.Ny_tot;
+    jminr = sim->grid.Nx_tot - sim->grid.gx;
+    jmaxr = sim->grid.Nx_tot;
+    lo    = jmaxl;
+    hi    = jminr;
+  }
+  else{
+    imaxl = sim->grid.gy;
+    jmaxl = sim->grid.Nx_tot;
+    iminr = sim->grid.Ny_tot - sim->grid.gy;
+    imaxr = sim->grid.Ny_tot;
+    jminr = 0;
+    jmaxr = sim->grid.Nx_tot;
+    lo    = imaxl;
+    hi    = iminr;
+  }
 
-  #pragma omp parallel for
-  for(u64 i=0; i < lo; i++){
-    sim->cstate.rho  [i] = sim->cstate.rho  [lo];
-    sim->cstate.rho_u[i] = sim->cstate.rho_u[lo];
-    sim->cstate.E    [i] = sim->cstate.E    [lo];
-  }
-  #pragma omp parallel for
-  for(u64 i=hi; i < sim->grid.Nx_tot; i++){
-    sim->cstate.rho  [i] = sim->cstate.rho  [hi-1];
-    sim->cstate.rho_u[i] = sim->cstate.rho_u[hi-1];
-    sim->cstate.E    [i] = sim->cstate.E    [hi-1];
-  }
+  // left side
+  //#pragma omp parallel for
+  for(u64 i=0; i < imaxl; i++)
+    for(u64 j=0; j < jmaxl; j++){
+      const u64 id    = cell_id(i,j);
+      const u64 id_lo = cell_id(i,lo);
+      rho  [id] = rho  [id_lo];
+      rho_u[id] = rho_u[id_lo];
+      rho_v[id] = rho_v[id_lo];
+      E    [id] = E    [id_lo];
+    }
+  // right side
+  //#pragma omp parallel for
+  for(u64 i=iminr; i < imaxr; i++)
+    for(u64 j=jminr; j < jmaxr; j++){
+      const u64 id    = cell_id(i,j);
+      const u64 id_hi = cell_id(i,hi-1);
+      rho  [id] = rho  [id_hi];
+      rho_u[id] = rho_u[id_hi];
+      rho_v[id] = rho_v[id_hi];
+      E    [id] = E    [id_hi];
+    }
 }
 
 void step(struct sim *sim, real_t dt_max)
@@ -435,9 +520,11 @@ void step(struct sim *sim, real_t dt_max)
   sim->t += dt;
   
   compute_slope(sim);
-  compute_fluxes(sim);
+  compute_fluxes(sim, IX);
+  compute_fluxes(sim, IY);
   cells_update(sim, dt);
-  fill_boundaries_absorbing(sim);
+  fill_boundaries_absorbing(sim, IX);
+  fill_boundaries_absorbing(sim, IY);
   cons_to_prim(sim);
 }
 

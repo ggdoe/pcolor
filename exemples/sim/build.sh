@@ -10,5 +10,5 @@ SRC="./sim.c"
 out="sim.out"
 
 set -xe
-$CC $CFLAGS -I$IDIR -o $out $SRC $LIB -Wno-unknown-pragmas
+$CC $CFLAGS -I$IDIR -o $out $SRC $LIB
 
