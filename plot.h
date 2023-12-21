@@ -35,7 +35,7 @@ void fill(uint32_t *pixels, int width, int height, uint8_t red, uint8_t green, u
     memset(pixels, color, width * height * sizeof(uint32_t));
 }
 
-void plot(uint32_t *pixels, int width, int height, double *data, uint32_t nb_elem, struct lim *ylim, uint32_t color)
+void plot(uint32_t *pixels, int width, int height, const double *data, uint32_t nb_elem, struct lim *ylim, uint32_t color)
 {
     double min, max;
     if(ylim == NULL){
