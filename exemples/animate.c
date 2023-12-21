@@ -22,6 +22,7 @@ struct callback_args
   int h;
   struct pcolor_state *pstate;
   int map;
+  double deform_factor;
 };
 
 void callback_fill_color(void *args)
@@ -59,15 +60,15 @@ void callback_cycle_mapping(void *args)
       ring_map(x, y, w, h);
       break;
     case 1:
-      colella_map(x, y, w, h);
+      colella_map(x, y, w, h, s->deform_factor);
       break;
     case 2:
       ring_map(x, y, w, h);
-      colella_map(x, y, w, h);
+      colella_map(x, y, w, h, s->deform_factor);
       break;
     case 3:
       ring_map(x, y, w, h);
-      colella_map(x, y, w, h);
+      colella_map(x, y, w, h, s->deform_factor);
       pert_map(x, y, w, h, 0.01);
       // rectify perturbation mapping
       for(int i=0; i < h; i++){
@@ -110,7 +111,18 @@ void callback_dec_w(void *args)
   if(s->w < 2) s->w=2;
   s->map--;callback_cycle_mapping(args);
 }
-
+void callback_inc_deform(void *args)
+{
+  struct callback_args *s = args;
+  s->deform_factor+=0.005;
+  s->map--;callback_cycle_mapping(args);
+}
+void callback_dec_deform(void *args)
+{
+  struct callback_args *s = args;
+  s->deform_factor-=0.005;
+  s->map--;callback_cycle_mapping(args);
+}
 
 
 int main(int argc, char **argv)
@@ -123,18 +135,20 @@ int main(int argc, char **argv)
   // pstate.show_edge = false;
   pstate.color_egde = 0xFF000000;
 
-  struct callback_args args = {.h = 20, .w = 80, .map = 0, .pstate = &pstate};
+  struct callback_args args = {.h = 20, .w = 80, .map = 0, .deform_factor = 0.01, .pstate = &pstate};
   
   callback_cycle_mapping(&args);
   callback_fill_color(&args);
   
-  struct custom_keyevent ckey[6]; const int number_custom_keyevent = sizeof(ckey)/sizeof(struct custom_keyevent);
+  struct custom_keyevent ckey[8]; const int number_custom_keyevent = sizeof(ckey)/sizeof(struct custom_keyevent);
   ckey[0] = (struct custom_keyevent){.key = SDLK_m, .callback = callback_cycle_mapping, .callback_args = &args};
   ckey[1] = (struct custom_keyevent){.key = SDLK_e, .callback = callback_toggle_edge, .callback_args = &pstate};
   ckey[2] = (struct custom_keyevent){.key = SDLK_UP, .callback = callback_inc_h, .callback_args = &args};
   ckey[3] = (struct custom_keyevent){.key = SDLK_DOWN, .callback = callback_dec_h, .callback_args = &args};
   ckey[4] = (struct custom_keyevent){.key = SDLK_LEFT, .callback = callback_dec_w, .callback_args = &args};
   ckey[5] = (struct custom_keyevent){.key = SDLK_RIGHT, .callback = callback_inc_w, .callback_args = &args};
+  ckey[6] = (struct custom_keyevent){.key = SDLK_KP_PLUS, .callback = callback_inc_deform, .callback_args = &args};
+  ckey[7] = (struct custom_keyevent){.key = SDLK_KP_MINUS, .callback = callback_dec_deform, .callback_args = &args};
   
   animate(pixels, IMG_WIDTH, IMG_HEIGHT, 60.0, callback_fill_color, &args, ckey, number_custom_keyevent);
 

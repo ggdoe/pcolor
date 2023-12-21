@@ -35,14 +35,14 @@ void pert_map(double *x, double *y, int w_grid, int h_grid, double amplitude)
     }
 }
 
-void colella_map(double *x, double *y, int w, int h)
+void colella_map(double *x, double *y, int w, int h, double deform)
 {
     const double Lx = 1.0;
     const double Ly = 1.0;
 
     for (int i = 0; i < w*h; i++)
     {
-        double sinsin = 0.07 * sin(2.0 * M_PI * x[i] / Lx) * sin(2.0 * M_PI * y[i] / Ly);
+        double sinsin = deform * sin(2.0 * M_PI * x[i] / Lx) * sin(2.0 * M_PI * y[i] / Ly);
         x[i] += sinsin;
         y[i] += sinsin;
     }
