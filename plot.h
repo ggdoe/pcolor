@@ -110,12 +110,12 @@ void fill_grid(uint32_t *pixels, int width, int height, struct lim *xlim, struct
 
     // axis
     if(xlim->min <= 0.0 && xlim->max >= 0.0){
-        uint32_t i = width * (0.0 - xlim->min) / diff_x;
+        uint32_t i = (width - 1) * (0.0 - xlim->min) / diff_x;
         for(uint32_t j = 0; j < height; j++)
             pixels[j * width + i] = axis_color;
     }
     if(ylim->min <= 0.0 && ylim->max >= 0.0){
-        uint32_t j = height * (0.0 - ylim->min) / diff_y;
+        uint32_t j = (height - 1) * (1 - (ylim->min - 0.0)) / diff_y;
         for(uint32_t i = 0; i < width; i++)
             pixels[j * width + i] = axis_color;
     }
