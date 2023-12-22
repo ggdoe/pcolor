@@ -1,7 +1,7 @@
 #!/bin/sh
 CC="gcc"
 
-CFLAGS="-Wall -O3 -g"
+CFLAGS="-Wall -O3 -g -fopenmp"
 LIB="-lm -lSDL2"
 IDIR="../../."
 

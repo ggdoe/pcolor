@@ -19,28 +19,28 @@ int main(int argc, char** argv)
   fill(pixels, IMG_WIDTH, IMG_HEIGHT, 255, 255, 255);
 
 
-  struct sim sim = init_sim(NB_POINTS, 64);
+  struct sim sim = init_sim(NB_POINTS, 128);
   init_state(&sim);
   run(&sim, 0.2);
   
   const real_t *rho_slice = sim.pstate.rho + sim.grid.Nx_tot * sim.grid.Ny_tot / 2;
-  // const real_t *  u_slice = sim.pstate.u   + sim.grid.Nx_tot * sim.grid.Ny_tot / 2;
-  // const real_t *  v_slice = sim.pstate.v   + sim.grid.Nx_tot * sim.grid.Ny_tot / 2;
-  // const real_t *  p_slice = sim.pstate.p   + sim.grid.Nx_tot * sim.grid.Ny_tot / 2;
+  const real_t *  u_slice = sim.pstate.u   + sim.grid.Nx_tot * sim.grid.Ny_tot / 2;
+  const real_t *  v_slice = sim.pstate.v   + sim.grid.Nx_tot * sim.grid.Ny_tot / 2;
+  const real_t *  p_slice = sim.pstate.p   + sim.grid.Nx_tot * sim.grid.Ny_tot / 2;
   
   // plot
   struct lim xlim = {0.0, 1.0};
   struct lim ylim = compute_lim(rho_slice, NB_POINTS, NULL);
-            //  ylim = compute_lim(  u_slice, NB_POINTS, &ylim);
-            //  ylim = compute_lim(  v_slice, NB_POINTS, &ylim);
-            //  ylim = compute_lim(  p_slice, NB_POINTS, &ylim);
+             ylim = compute_lim(  u_slice, NB_POINTS, &ylim);
+             ylim = compute_lim(  v_slice, NB_POINTS, &ylim);
+             ylim = compute_lim(  p_slice, NB_POINTS, &ylim);
   ylim.min -= 0.2;
   ylim.max += 0.2;
   fill_grid(pixels, IMG_WIDTH, IMG_HEIGHT, &xlim, &ylim, 0xFFAAAAAA);
   plot(pixels, IMG_WIDTH, IMG_HEIGHT, rho_slice, NB_POINTS, &ylim, 0xFFFF0000);
-  // plot(pixels, IMG_WIDTH, IMG_HEIGHT,   u_slice, NB_POINTS, &ylim, 0xFF00FF00);
-  // plot(pixels, IMG_WIDTH, IMG_HEIGHT,   v_slice, NB_POINTS, &ylim, 0xFF0000FF);
-  // plot(pixels, IMG_WIDTH, IMG_HEIGHT,   p_slice, NB_POINTS, &ylim, 0xFF00FFFF);
+  plot(pixels, IMG_WIDTH, IMG_HEIGHT,   u_slice, NB_POINTS, &ylim, 0xFF00FF00);
+  plot(pixels, IMG_WIDTH, IMG_HEIGHT,   v_slice, NB_POINTS, &ylim, 0xFF0000FF);
+  plot(pixels, IMG_WIDTH, IMG_HEIGHT,   p_slice, NB_POINTS, &ylim, 0xFF00FFFF);
   show(pixels, IMG_WIDTH, IMG_HEIGHT);
 
   free_sim(&sim);

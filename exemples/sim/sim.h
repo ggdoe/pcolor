@@ -8,10 +8,10 @@
 #define for_each_interfaces_y(i)  for(u64 i=sim->grid.jmin-1; i < sim->grid.imax+1; i++)
 #define cell_id(i,j) (i*sim->grid.Nx_tot + j)
 
-#define DECLARE_PSTATE_VAR              \
-        double *rho = sim->pstate.rho;  \
-        double *u   = sim->pstate.u;    \
-        double *v   = sim->pstate.v;    \
+#define DECLARE_PSTATE_VAR                  \
+        double *rho = sim->pstate.rho;      \
+        double *u   = sim->pstate.u;        \
+        double *v   = sim->pstate.v;        \
         double *p   = sim->pstate.p;
 
 #define DECLARE_CSTATE_VAR                  \
@@ -21,10 +21,11 @@
         double *E     = sim->cstate.E;
         
 #define DECLARE_STATES_VAR                  \
-        double *rho   = sim->pstate.rho;    \
+        double *prho  = sim->pstate.rho;    \
         double *u     = sim->pstate.u;      \
         double *v     = sim->pstate.v;      \
         double *p     = sim->pstate.p;      \
+        double *crho  = sim->cstate.rho;    \
         double *rho_u = sim->cstate.rho_u;  \
         double *rho_v = sim->cstate.rho_v;  \
         double *E     = sim->cstate.E;
@@ -94,15 +95,15 @@ void prim_to_cons(struct sim *sim)
 {
   DECLARE_STATES_VAR
 
-  //#pragma omp parallel for
+  #pragma omp parallel for collapse(2)
   for_each_cells_and_ghost_y(i)
     for_each_cells_and_ghost_x(j)
     {
       const u64 id = cell_id(i,j);
-      real_t Ec = 0.5 * rho[id] * (u[id] * u[id] + v[id] * v[id]);
-      rho[id]   = rho[id];
-      rho_u[id] = rho[id] * u[id];
-      rho_v[id] = rho[id] * v[id];
+      real_t Ec = 0.5 * prho[id] * (u[id] * u[id] + v[id] * v[id]);
+      crho[id]  = prho[id];
+      rho_u[id] = prho[id] * u[id];
+      rho_v[id] = prho[id] * v[id];
       E[id]     = Ec + p[id] / (sim->gamma - 1.0);
     }
 }
@@ -111,16 +112,16 @@ void cons_to_prim(struct sim *sim)
 {
   DECLARE_STATES_VAR
 
-  //#pragma omp parallel for
+  #pragma omp parallel for collapse(2)
   for_each_cells_and_ghost_y(i)
     for_each_cells_and_ghost_x(j)
     {
       const u64 id = cell_id(i,j);
-      real_t Ec = 0.5 * (rho_u[id] * rho_u[id] + rho_v[id] * rho_v[id]) / rho[id];
-      rho[id] = rho[id];
-      u[id]   = rho_u[id] / rho[id];
-      v[id]   = rho_v[id] / rho[id];
-      p[id]   = (E[id] - Ec) * (sim->gamma - 1.0);
+      real_t Ec = 0.5 * (rho_u[id] * rho_u[id] + rho_v[id] * rho_v[id]) / crho[id];
+      prho[id] = crho[id];
+      u[id]    = rho_u[id] / crho[id];
+      v[id]    = rho_v[id] / crho[id];
+      p[id]    = (E[id] - Ec) * (sim->gamma - 1.0);
       // if(p[i] < 0)
       //   printf("negative pressure !!\n");
     }
@@ -131,6 +132,7 @@ void init_state(struct sim *sim)
   DECLARE_PSTATE_VAR
   sim->t = 0;
 
+  #pragma omp parallel for collapse(2)
   for_each_cells_and_ghost_y(i)
     for_each_cells_and_ghost_x(j)
     {
@@ -209,7 +211,7 @@ struct sim init_sim(u32 Nx, u32 Ny)
   const u32 gx = 2, gy = 2;
   sim.grid = init_grid(Nx, Ny, gx, gy);
   sim.gamma = 1.4;
-  sim.cfl = 0.2;
+  sim.cfl = 0.1;
   sim.t = 0.0;
 
   alloc_state(&sim.cstate, sim.grid.Nx_tot * sim.grid.Ny_tot);
@@ -253,7 +255,7 @@ real_t compute_dt(struct sim *sim)
   const double dy = sim->grid.dy;
   const double gamma = sim->gamma;
 
-  //#pragma omp parallel for reduction(min:inv_dt)
+  #pragma omp parallel for reduction(min:dt) collapse(2)
   for_each_cells_y(i)
     for_each_cells_x(j)
     {
@@ -335,7 +337,7 @@ struct fcell riemann_hllc(struct pcell *restrict left, struct pcell *restrict ri
   // Compute the Godunov flux
   flux.rho   = ro*uo;
   flux.rho_u = ro*uo*uo+ptoto;
-  flux.rho_v = (flux.rho > 0) ? flux.rho*vl : flux.rho*vr;
+  flux.rho_v = (flux.rho > 0.0) ? flux.rho*vl : flux.rho*vr;
   flux.E = (etoto+ptoto)*uo;
 
   return flux;
@@ -386,7 +388,7 @@ void compute_slope(struct sim *sim)
   const u64 offset_x = 1;
   const u64 offset_y = sim->grid.Nx_tot;
 
-  //#pragma omp parallel for
+  #pragma omp parallel for
   for_each_cells_y(i)
     for_each_cells_x(j){
       const u64 id = cell_id(i,j);
@@ -404,19 +406,18 @@ void compute_slope(struct sim *sim)
     }
 }
 
-void swap_uv(void* state)
+void swap_uv(struct pcell* cell)
 {
-  struct pcell *s = state;
-  real_t swap = s->u;
-  s->u = s->v;
-  s->v = swap;
+  real_t swap = cell->u;
+  cell->u = cell->v;
+  cell->v = swap;
 }
 
 void compute_fluxes(struct sim *sim, enum dir dir)
 {
   struct cstate *flux = (dir == IX) ? &sim->flux_x : &sim->flux_y;
 
-  //#pragma omp parallel for
+  #pragma omp parallel for collapse(2)
   for_each_interfaces_y(i)
     for_each_interfaces_x(j)
     {
@@ -428,9 +429,10 @@ void compute_fluxes(struct sim *sim, enum dir dir)
       }
 
       struct fcell riemannflux = riemann_hllc(&iv.left, &iv.right, sim->gamma);
+
       if(dir == IY)
-        swap_uv(&riemannflux);
-        
+        swap_uv((struct pcell*)&riemannflux);
+
       flux->rho  [id] = riemannflux.rho;
       flux->rho_u[id] = riemannflux.rho_u;
       flux->rho_v[id] = riemannflux.rho_v;
@@ -445,21 +447,21 @@ void cells_update(struct sim *sim, real_t dt)
   const real_t dtdy = dt / sim->grid.dy;
   const u64 off_x = 1;
   const u64 off_y = sim->grid.Nx_tot;
-  struct cstate *flux_x = &sim->flux_x;
-  struct cstate *flux_y = &sim->flux_y;
+  struct cstate *fx = &sim->flux_x;
+  struct cstate *fy = &sim->flux_y;
 
-  //#pragma omp parallel for
+  #pragma omp parallel for collapse(2)
   for_each_cells_y(i)
     for_each_cells_x(j){
       const u64 id = cell_id(i,j);
-      rho  [id] += dtdx * (flux_x->rho  [id-off_x] - flux_x->rho  [id])
-                 + dtdy * (flux_y->rho  [id-off_y] - flux_y->rho  [id]);
-      rho_u[id] += dtdx * (flux_x->rho_u[id-off_x] - flux_x->rho_u[id])
-                 + dtdy * (flux_y->rho_u[id-off_y] - flux_y->rho_u[id]);
-      rho_v[id] += dtdx * (flux_x->rho_v[id-off_x] - flux_x->rho_v[id])
-                 + dtdy * (flux_y->rho_v[id-off_y] - flux_y->rho_v[id]);
-      E    [id] += dtdx * (flux_x->E    [id-off_x] - flux_x->E    [id])
-                 + dtdy * (flux_y->E    [id-off_y] - flux_y->E    [id]);
+      rho  [id] += dtdx * (fx->rho  [id-off_x] - fx->rho  [id])
+                 + dtdy * (fy->rho  [id-off_y] - fy->rho  [id]);
+      rho_u[id] += dtdx * (fx->rho_u[id-off_x] - fx->rho_u[id])
+                 + dtdy * (fy->rho_u[id-off_y] - fy->rho_u[id]);
+      rho_v[id] += dtdx * (fx->rho_v[id-off_x] - fx->rho_v[id])
+                 + dtdy * (fy->rho_v[id-off_y] - fy->rho_v[id]);
+      E    [id] += dtdx * (fx->E    [id-off_x] - fx->E    [id])
+                 + dtdy * (fy->E    [id-off_y] - fy->E    [id]);
   }
 }
 
@@ -490,7 +492,7 @@ void fill_boundaries_absorbing(struct sim *sim, enum dir dir)
   }
 
   // left side
-  //#pragma omp parallel for
+  #pragma omp parallel for collapse(2)
   for(u64 i=0; i < imaxl; i++)
     for(u64 j=0; j < jmaxl; j++){
       const u64 id    = cell_id(i,j);
@@ -501,7 +503,7 @@ void fill_boundaries_absorbing(struct sim *sim, enum dir dir)
       E    [id] = E    [id_lo];
     }
   // right side
-  //#pragma omp parallel for
+  #pragma omp parallel for collapse(2)
   for(u64 i=iminr; i < imaxr; i++)
     for(u64 j=jminr; j < jmaxr; j++){
       const u64 id    = cell_id(i,j);
