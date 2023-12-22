@@ -2,46 +2,76 @@
 #include "show.h"
 #include "plot.h"
 #include "pcolor.h"
+#include "cmap.h"
 
-#define IMG_FACTOR 60
-#define IMG_WIDTH  (16 * IMG_FACTOR)
-#define IMG_HEIGHT (12  * IMG_FACTOR)
-#define NB_POINTS 256
+#define IMG_FACTOR 64
+#define IMG_WIDTH  (10 * IMG_FACTOR)
+#define IMG_HEIGHT (10  * IMG_FACTOR)
+#define NB_POINTS 64
 
-// void print_state(struct sim *sim){
-//   for(u32 i=sim->grid.imin ; i < sim->grid.imax; i++)
-//     printf("%.3f\t%.3f\t%.3f\t%.3f\n", sim->grid.cellcenter[i], sim->pstate.rho[i], sim->pstate.u[i], sim->pstate.p[i]);
-// }
+void compute_minmax(real_t *out_min, real_t *out_max, struct grid *grid, real_t *values)
+{
+  real_t min =  FLT_MAX;
+  real_t max = -FLT_MAX;
+
+  #pragma omp parallel for collapse(2)
+  for(u64 i=grid->imin  ; i < grid->imax  ; i++)
+    for(u64 j=grid->jmin  ; j < grid->jmax  ; j++)
+    {
+      const u64 id = (i*grid->Nx_tot + j);
+      min = (min < values[id]) ? min : values[id];
+      max = (max > values[id]) ? max : values[id];
+    }
+    *out_min = min;
+    *out_max = max;
+}
+
+void fill_pixels(uint32_t *pixels, struct grid *grid, real_t *values)
+{
+  real_t min = 0.0, max = 1.0;
+  compute_minmax(&min, &max, grid, values);
+
+  #pragma omp parallel for collapse(2)
+  for(u64 i=grid->imin  ; i < grid->imax  ; i++)
+    for(u64 j=grid->jmin  ; j < grid->jmax  ; j++){
+      const u64 id  = (i*grid->Nx_tot + j);
+      const u64 id_pixel = ((i-grid->imin)*grid->Nx + (j-grid->jmin));
+      pixels[id_pixel] = cmap_nipy_spectral((values[id]-min)/(max-min));
+    }
+}
+
+struct callback_args{
+  struct pcolor_state *pcolor_state;
+  struct sim *sim;
+};
+
+void callback_dummy(void *args){}
+
+void callback_update(void *args)
+{
+  struct callback_args *s = args;
+  run(s->sim, s->sim->t + 0.005);
+  pcolor_real(s->pcolor_state, s->sim->pstate.rho, 0.125, 1.0);
+}
 
 int main(int argc, char** argv)
 {
   uint32_t *pixels = malloc(IMG_WIDTH * IMG_HEIGHT * sizeof(uint32_t));
   fill(pixels, IMG_WIDTH, IMG_HEIGHT, 255, 255, 255);
 
-
-  struct sim sim = init_sim(NB_POINTS, 128);
+  struct sim sim = init_sim(NB_POINTS, NB_POINTS);
   init_state(&sim);
-  run(&sim, 0.2);
+
+  struct pcolor_state pcolor_state = pcolor_state_alloc(pixels, IMG_WIDTH, IMG_HEIGHT);
+  pcolor_state.show_edge = false;
+
+  pcolor_fill_state(&pcolor_state, sim.grid.vertex_x, sim.grid.vertex_y, sim.grid.Nx_tot, sim.grid.Ny_tot);
+  pcolor_real(&pcolor_state, sim.pstate.rho, 0.125, 1.0);
+
+  struct callback_args callback_args = {.pcolor_state=&pcolor_state, .sim=&sim};
+  struct custom_keyevent kevent = {.key=SDLK_SPACE, .callback=callback_update, .callback_args=&callback_args};
   
-  const real_t *rho_slice = sim.pstate.rho + sim.grid.Nx_tot * sim.grid.Ny_tot / 2;
-  const real_t *  u_slice = sim.pstate.u   + sim.grid.Nx_tot * sim.grid.Ny_tot / 2;
-  const real_t *  v_slice = sim.pstate.v   + sim.grid.Nx_tot * sim.grid.Ny_tot / 2;
-  const real_t *  p_slice = sim.pstate.p   + sim.grid.Nx_tot * sim.grid.Ny_tot / 2;
-  
-  // plot
-  struct lim xlim = {0.0, 1.0};
-  struct lim ylim = compute_lim(rho_slice, NB_POINTS, NULL);
-             ylim = compute_lim(  u_slice, NB_POINTS, &ylim);
-             ylim = compute_lim(  v_slice, NB_POINTS, &ylim);
-             ylim = compute_lim(  p_slice, NB_POINTS, &ylim);
-  ylim.min -= 0.2;
-  ylim.max += 0.2;
-  fill_grid(pixels, IMG_WIDTH, IMG_HEIGHT, &xlim, &ylim, 0xFFAAAAAA);
-  plot(pixels, IMG_WIDTH, IMG_HEIGHT, rho_slice, NB_POINTS, &ylim, 0xFFFF0000);
-  plot(pixels, IMG_WIDTH, IMG_HEIGHT,   u_slice, NB_POINTS, &ylim, 0xFF00FF00);
-  plot(pixels, IMG_WIDTH, IMG_HEIGHT,   v_slice, NB_POINTS, &ylim, 0xFF0000FF);
-  plot(pixels, IMG_WIDTH, IMG_HEIGHT,   p_slice, NB_POINTS, &ylim, 0xFF00FFFF);
-  show(pixels, IMG_WIDTH, IMG_HEIGHT);
+  animate(pixels, IMG_WIDTH, IMG_HEIGHT, 60.0, callback_dummy, NULL, &kevent, 1);
 
   free_sim(&sim);
   return 0;
