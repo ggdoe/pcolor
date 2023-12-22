@@ -32,7 +32,7 @@ int main(int argc, char **argv)
   meshgrid(x, y, w, h, 0.0, 1.0, 0.0, 1.0);
 
   ring_map(x, y, w, h);
-  colella_map(x, y, w, h);
+  colella_map(x, y, w, h, 0.07);
   // pert_map(x, y, w, h, 0.01);
 
   for (int i = 0; i < (w-1) * (h-1); i++){

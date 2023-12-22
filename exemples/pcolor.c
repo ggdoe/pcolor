@@ -32,7 +32,7 @@ int main(int argc, char **argv)
 
   // remap grid
   ring_map(x, y, w, h);
-  colella_map(x, y, w, h);
+  colella_map(x, y, w, h, 0.07);
 
   for (int i = 0; i < (w-1) * (h-1); i++){
       C[i] = cmap_nipy_spectral((double)rand()/RAND_MAX);

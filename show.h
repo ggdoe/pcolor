@@ -243,7 +243,7 @@ void animate(uint32_t *pixels, int width, int height, double target_fps, callbac
         {
             manage_event(&ss);
 
-            // add custom key event
+            // custom key event
             if(ss.event.type == SDL_KEYDOWN){
                 for(int i=0; i < number_custom_keyevent; i++)
                     if(ss.event.key.keysym.sym == custom_event[i].key)

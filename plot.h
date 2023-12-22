@@ -98,12 +98,12 @@ void fill_grid(uint32_t *pixels, int width, int height, struct lim *xlim, struct
 
     // grid
     for(double x = ceil(xlim->min/dx)*dx; x < xlim->max; x+=dx){
-        uint32_t i = width * (x - xlim->min) / diff_x;
+        uint32_t i = (width - 1) * (x - xlim->min) / diff_x;
         for(uint32_t j = 0; j < height; j++)
             pixels[j * width + i] = color;
     }
     for(double y = ceil(ylim->min/dy)*dy; y < ylim->max; y+=dy){
-        uint32_t j = height * (y - ylim->min) / diff_y;
+        uint32_t j = (height - 1) * (y - ylim->min) / diff_y;
         for(uint32_t i = 0; i < width; i++)
             pixels[j * width + i] = color;
     }
