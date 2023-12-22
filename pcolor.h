@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdint.h>
+#include "cmap.h"
 
 struct pcolor_state{
     int w_pixels;
@@ -100,7 +101,7 @@ struct pcolor_state pcolor_state_alloc(uint32_t *pixels, int w_pixels, int h_pix
         .w_pixels = w_pixels,
         .h_pixels = h_pixels,
         .ld_pixels = w_pixels,
-        .color_egde = 0xFFFFFFFF,
+        .color_egde = 0xFFAAAAAA,
         .color_outside = 0xFF111111,
         .show_edge = true
     };
@@ -115,9 +116,9 @@ void pcolor_free(struct pcolor_state *state)
     free(state->pixel_color_id);
 }
 
-void pcolor_fill_state(struct pcolor_state *state, double *x, double *y, int w_grid, int h_grid)
+// Nx : number cell x-axis      Ny : number cells y-axis
+void pcolor_fill_state(struct pcolor_state *state, double *vertex_x, double *vertex_y, int Nx, int Ny, int ld)
 {
-
     const int w_pixels  = state->w_pixels;
     const int h_pixels  = state->h_pixels;
 
@@ -126,24 +127,24 @@ void pcolor_fill_state(struct pcolor_state *state, double *x, double *y, int w_g
         state->pixel_type[i] = PCOLOR_TYPE_OUTSIDE;
     }
 
-    const double xmin = _pcolor_min(x, w_grid*h_grid), ymin = _pcolor_min(y, w_grid*h_grid);
-    const double xmax = _pcolor_max(x, w_grid*h_grid), ymax = _pcolor_max(y, w_grid*h_grid);
+    const double xmin = _pcolor_min(vertex_x, (Nx+1)*(Ny+1)), ymin = _pcolor_min(vertex_y, (Nx+1)*(Ny+1));
+    const double xmax = _pcolor_max(vertex_x, (Nx+1)*(Ny+1)), ymax = _pcolor_max(vertex_y, (Nx+1)*(Ny+1));
     
-    for (int i = 0; i < h_grid - 1; i++) {
-        for (int j = 0; j < w_grid - 1; j++) {
+    for (int i = 0; i < Ny; i++) {
+        for (int j = 0; j < Nx; j++) {
 
             // vertex of the current cell
             int jv[] = {
-                (x[ i    * w_grid + j  ] - xmin) / (xmax - xmin) * (w_pixels-1), 
-                (x[ i    * w_grid + j+1] - xmin) / (xmax - xmin) * (w_pixels-1), 
-                (x[(i+1) * w_grid + j+1] - xmin) / (xmax - xmin) * (w_pixels-1), 
-                (x[(i+1) * w_grid + j  ] - xmin) / (xmax - xmin) * (w_pixels-1)
+                (vertex_x[ i    * (Nx+1) + j  ] - xmin) / (xmax - xmin) * (w_pixels-1), 
+                (vertex_x[ i    * (Nx+1) + j+1] - xmin) / (xmax - xmin) * (w_pixels-1), 
+                (vertex_x[(i+1) * (Nx+1) + j+1] - xmin) / (xmax - xmin) * (w_pixels-1), 
+                (vertex_x[(i+1) * (Nx+1) + j  ] - xmin) / (xmax - xmin) * (w_pixels-1)
             };
             int iv[] = {
-                (y[ i    * w_grid + j  ] - ymin) / (ymax - ymin) * (h_pixels-1), 
-                (y[ i    * w_grid + j+1] - ymin) / (ymax - ymin) * (h_pixels-1), 
-                (y[(i+1) * w_grid + j+1] - ymin) / (ymax - ymin) * (h_pixels-1),
-                (y[(i+1) * w_grid + j  ] - ymin) / (ymax - ymin) * (h_pixels-1)
+                (vertex_y[ i    * (Nx+1) + j  ] - ymin) / (ymax - ymin) * (h_pixels-1), 
+                (vertex_y[ i    * (Nx+1) + j+1] - ymin) / (ymax - ymin) * (h_pixels-1), 
+                (vertex_y[(i+1) * (Nx+1) + j+1] - ymin) / (ymax - ymin) * (h_pixels-1),
+                (vertex_y[(i+1) * (Nx+1) + j  ] - ymin) / (ymax - ymin) * (h_pixels-1)
             };
 
             // boundary of the box
@@ -155,8 +156,8 @@ void pcolor_fill_state(struct pcolor_state *state, double *x, double *y, int w_g
             for(int id = imin; id <= imax; id++)
                 for(int jd = jmin; jd <= jmax; jd++)
                     if(is_inside_quad(iv, jv, id, jd)){
-                        state->pixel_type[id * w_pixels + jd] = PCOLOR_TYPE_CELL;
-                        state->pixel_color_id[id * w_pixels + jd] = i * (w_grid-1) + j;
+                        state->pixel_type    [id * w_pixels + jd] = PCOLOR_TYPE_CELL;
+                        state->pixel_color_id[id * w_pixels + jd] = i * Nx + j;
                     }
 
             draw_line(state->pixel_type, w_pixels, h_pixels, iv[0], jv[0], iv[1], jv[1], PCOLOR_TYPE_EDGE);
@@ -188,29 +189,52 @@ void pcolor(struct pcolor_state *state, uint32_t *color_grid)
         }
 }
 
-void pcolor_nostate(uint32_t *pixels, int w_pixels, int h_pixels, double *x, double *y, int w_grid, int h_grid, uint32_t *color_grid, bool show_edge, uint32_t color_egde, uint32_t color_outside) 
+void pcolor_real(struct pcolor_state *state, real_t *values, real_t min, real_t max)
+{
+    for(int i = 0; i < state->h_pixels; i++)
+        for(int j = 0; j < state->w_pixels; j++)
+        {
+            const int id_pixels = i*state->ld_pixels + j;
+            const int id_color  = i*state-> w_pixels + j;
+            switch (state->pixel_type[id_color]){
+                #define CELLCOLOR cmap_nipy_spectral((values[state->pixel_color_id[id_color]] - min)/(max - min));
+                case PCOLOR_TYPE_CELL:
+                    state->pixels[id_pixels] = CELLCOLOR;
+                    break;
+                case PCOLOR_TYPE_EDGE:
+                    state->pixels[id_pixels] = (state->show_edge) ? state->color_egde : CELLCOLOR;
+                    break;
+                case PCOLOR_TYPE_OUTSIDE:
+                    state->pixels[id_pixels] = state->color_outside;
+                    break;
+                #undef CELLCOLOR
+            }
+        }
+}
+
+void pcolor_nostate(uint32_t *pixels, int w_pixels, int h_pixels, double *vertex_x, double *vertex_y, int Nx, int Ny, uint32_t *cells_color, bool show_edge, uint32_t color_egde, uint32_t color_outside) 
 {
     for (int i = 0; i < w_pixels * h_pixels; i++)
         pixels[i] = color_outside;
 
-    const double xmin = _pcolor_min(x, w_grid*h_grid), ymin = _pcolor_min(y, w_grid*h_grid);
-    const double xmax = _pcolor_max(x, w_grid*h_grid), ymax = _pcolor_max(y, w_grid*h_grid);
+    const double xmin = _pcolor_min(vertex_x, (Nx+1)*(Ny+1)), ymin = _pcolor_min(vertex_y, (Nx+1)*(Ny+1));
+    const double xmax = _pcolor_max(vertex_x, (Nx+1)*(Ny+1)), ymax = _pcolor_max(vertex_y, (Nx+1)*(Ny+1));
 
-    for (int i = 0; i < h_grid - 1; i++) {
-        for (int j = 0; j < w_grid - 1; j++) {
+    for (int i = 0; i < Ny; i++) {
+        for (int j = 0; j < Nx; j++) {
 
             // vertex of the cell
             int jv[] = {
-                (x[ i    * w_grid + j  ] - xmin) / (xmax - xmin) * (w_pixels-1), 
-                (x[ i    * w_grid + j+1] - xmin) / (xmax - xmin) * (w_pixels-1), 
-                (x[(i+1) * w_grid + j+1] - xmin) / (xmax - xmin) * (w_pixels-1), 
-                (x[(i+1) * w_grid + j  ] - xmin) / (xmax - xmin) * (w_pixels-1)
+                (vertex_x[ i    * (Nx+1) + j  ] - xmin) / (xmax - xmin) * (w_pixels-1), 
+                (vertex_x[ i    * (Nx+1) + j+1] - xmin) / (xmax - xmin) * (w_pixels-1), 
+                (vertex_x[(i+1) * (Nx+1) + j+1] - xmin) / (xmax - xmin) * (w_pixels-1), 
+                (vertex_x[(i+1) * (Nx+1) + j  ] - xmin) / (xmax - xmin) * (w_pixels-1)
             };
             int iv[] = {
-                (y[ i    * w_grid + j  ] - ymin) / (ymax - ymin) * (h_pixels-1), 
-                (y[ i    * w_grid + j+1] - ymin) / (ymax - ymin) * (h_pixels-1), 
-                (y[(i+1) * w_grid + j+1] - ymin) / (ymax - ymin) * (h_pixels-1),
-                (y[(i+1) * w_grid + j  ] - ymin) / (ymax - ymin) * (h_pixels-1)
+                (vertex_y[ i    * (Nx+1) + j  ] - ymin) / (ymax - ymin) * (h_pixels-1), 
+                (vertex_y[ i    * (Nx+1) + j+1] - ymin) / (ymax - ymin) * (h_pixels-1), 
+                (vertex_y[(i+1) * (Nx+1) + j+1] - ymin) / (ymax - ymin) * (h_pixels-1),
+                (vertex_y[(i+1) * (Nx+1) + j  ] - ymin) / (ymax - ymin) * (h_pixels-1)
             };
 
             // boundary of the box
@@ -222,7 +246,7 @@ void pcolor_nostate(uint32_t *pixels, int w_pixels, int h_pixels, double *x, dou
             for(int id = imin; id <= imax; id++)
                 for(int jd = jmin; jd <= jmax; jd++)
                     if(is_inside_quad(iv, jv, id, jd))
-                        pixels[id * w_pixels + jd] =  color_grid[i * (w_grid-1) + j];
+                        pixels[id * w_pixels + jd] =  cells_color[i * Nx + j];
             
             if(show_edge){
                 draw_line(pixels, w_pixels, h_pixels, iv[0], jv[0], iv[1], jv[1], color_egde);
