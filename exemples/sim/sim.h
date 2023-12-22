@@ -1,95 +1,8 @@
+#pragma once
 #include "type.h"
-
-#define for_each_cells_x(j)            for(u64 j=sim->grid.jmin  ; j < sim->grid.jmax  ; j++)
-#define for_each_cells_y(i)            for(u64 i=sim->grid.imin  ; i < sim->grid.imax  ; i++)
-#define for_each_cells_and_ghost_x(j)  for(u64 j=0               ; j < sim->grid.Nx_tot; j++)
-#define for_each_cells_and_ghost_y(i)  for(u64 i=0               ; i < sim->grid.Ny_tot; i++)
-#define for_each_interfaces_x(j)       for(u64 j=sim->grid.imin-1; j < sim->grid.jmax+1; j++)
-#define for_each_interfaces_y(i)       for(u64 i=sim->grid.jmin-1; i < sim->grid.imax+1; i++)
-#define cell_id(i,j) (i*sim->grid.Nx_tot + j)
-
-#define DECLARE_PSTATE_VAR                  \
-        double *rho   = sim->pstate.rho;    \
-        double *u     = sim->pstate.u;      \
-        double *v     = sim->pstate.v;      \
-        double *p     = sim->pstate.p;
-
-#define DECLARE_CSTATE_VAR                  \
-        double *rho   = sim->cstate.rho;    \
-        double *rho_u = sim->cstate.rho_u;  \
-        double *rho_v = sim->cstate.rho_v;  \
-        double *E     = sim->cstate.E;
-        
-#define DECLARE_STATES_VAR                  \
-        double *prho  = sim->pstate.rho;    \
-        double *u     = sim->pstate.u;      \
-        double *v     = sim->pstate.v;      \
-        double *p     = sim->pstate.p;      \
-        double *crho  = sim->cstate.rho;    \
-        double *rho_u = sim->cstate.rho_u;  \
-        double *rho_v = sim->cstate.rho_v;  \
-        double *E     = sim->cstate.E;
-
-enum dir{
-  IX, IY
-};
-
-struct cstate{
-  real_t *restrict rho;
-  real_t *restrict rho_u;
-  real_t *restrict rho_v;
-  real_t *restrict E;
-};
-
-struct pstate{
-  real_t *restrict rho;
-  real_t *restrict u;
-  real_t *restrict v;
-  real_t *restrict p;
-};
-
-struct grid {
-  real_t xmin, ymin;
-  real_t xmax, ymax;
-
-  u32    Nx,     Ny;
-  u32    Nx_tot, Ny_tot;
-  u32    gx,     gy;
-  real_t dx,     dy;
-
-  real_t *vertex_x,     *vertex_y;
-  real_t *cellcenter_x, *cellcenter_y;
-
-  u32 jmin, imin;
-  u32 jmax, imax;
-};
-
-struct sim{
-  struct grid grid;
-  struct cstate cstate;
-  struct pstate pstate;
-  struct pstate slope_x;
-  struct pstate slope_y;
-  struct cstate flux_x;
-  struct cstate flux_y;
-  real_t gamma;
-  real_t cfl;
-  real_t t;
-};
-
-struct pcell {
-  real_t rho;
-  real_t u;
-  real_t v;
-  real_t p;
-};
-
-struct fcell{
-  real_t rho;
-  real_t rho_u;
-  real_t rho_v;
-  real_t E;
-};
+#include "utils.h"
+#include "initial_conditions.h"
+#include "boundary_conditions.h"
 
 void prim_to_cons(struct sim *sim)
 {
@@ -127,33 +40,6 @@ void cons_to_prim(struct sim *sim)
     }
 }
 
-void init_state(struct sim *sim)
-{
-  DECLARE_PSTATE_VAR
-  sim->t = 0;
-
-  #pragma omp parallel for collapse(2)
-  for_each_cells_and_ghost_y(i)
-    for_each_cells_and_ghost_x(j)
-    {
-      const u64 id = cell_id(i,j);
-      // if(sim->grid.cellcenter_y[id] < 0.5 * (sim->grid.ymax + sim->grid.ymin)){
-      if(sim->grid.cellcenter_x[id] < 0.5 * (sim->grid.xmax + sim->grid.xmin)){
-        rho[id] = 1.0;
-        u[id]   = 0;
-        v[id]   = 0;
-        p[id]   = 1.0;
-      }
-      else{
-        rho[id] = 0.125;
-        u[id]   = 0;
-        v[id]   = 0;
-        p[id]   = 0.1;
-      }
-    }
-  prim_to_cons(sim);
-}
-
 struct grid init_grid(u32 Nx, u32 Ny, u32 gx, u32 gy)
 {
   const real_t xmin = 0.0, ymin = 0.0;
@@ -178,8 +64,6 @@ struct grid init_grid(u32 Nx, u32 Ny, u32 gx, u32 gy)
     for(u64 j=0; j < grid.Nx_tot; j++){
       grid.cellcenter_x[i * grid.Nx_tot + j] = xmin + (0.5 - gx + j) * dx;
       grid.cellcenter_y[i * grid.Nx_tot + j] = ymin + (0.5 - gy + i) * dy;
-      // printf("%lf\t%lf\n", grid.cellcenter_x[i * grid.Nx_tot + j],
-      //                      grid.cellcenter_y[i * grid.Nx_tot + j]);
     }
   }
 
@@ -214,7 +98,7 @@ struct sim init_sim(u32 Nx, u32 Ny)
   const u32 gx = 2, gy = 2;
   sim.grid = init_grid(Nx, Ny, gx, gy);
   sim.gamma = 1.4;
-  sim.cfl = 0.02;
+  sim.cfl = 0.01;
   sim.t = 0.0;
 
   alloc_state(&sim.cstate,  sim.grid.Nx_tot * sim.grid.Ny_tot);
@@ -472,57 +356,6 @@ void cells_update(struct sim *sim, real_t dt)
   }
 }
 
-void fill_boundaries_absorbing(struct sim *sim, enum dir dir)
-{
-  DECLARE_CSTATE_VAR
-  u64 imaxl, jmaxl, lo;
-  u64 iminr, imaxr, jminr, jmaxr, hi;
-  
-  if(dir == IX){
-    imaxl = sim->grid.Ny_tot;
-    jmaxl = sim->grid.gx;
-    iminr = 0;
-    imaxr = sim->grid.Ny_tot;
-    jminr = sim->grid.Nx_tot - sim->grid.gx;
-    jmaxr = sim->grid.Nx_tot;
-    lo    = jmaxl;
-    hi    = jminr-1;
-  }
-  else{
-    imaxl = sim->grid.gy;
-    jmaxl = sim->grid.Nx_tot;
-    iminr = sim->grid.Ny_tot - sim->grid.gy;
-    imaxr = sim->grid.Ny_tot;
-    jminr = 0;
-    jmaxr = sim->grid.Nx_tot;
-    lo    = imaxl;
-    hi    = iminr-1;
-  }
-
-  // left side
-  #pragma omp parallel for collapse(2)
-  for(u64 i=0; i < imaxl; i++)
-    for(u64 j=0; j < jmaxl; j++){
-      const u64 id    = cell_id(i,j);
-      const u64 id_lo = (dir == IX) ? cell_id(i,lo) : cell_id(lo,j);
-      rho  [id] = rho  [id_lo];
-      rho_u[id] = rho_u[id_lo];
-      rho_v[id] = rho_v[id_lo];
-      E    [id] = E    [id_lo];
-    }
-  // right side
-  #pragma omp parallel for collapse(2)
-  for(u64 i=iminr; i < imaxr; i++)
-    for(u64 j=jminr; j < jmaxr; j++){
-      const u64 id    = cell_id(i,j);
-      const u64 id_hi = (dir == IX) ? cell_id(i,hi) : cell_id(hi,j);
-      rho  [id] = rho  [id_hi];
-      rho_u[id] = rho_u[id_hi];
-      rho_v[id] = rho_v[id_hi];
-      E    [id] = E    [id_hi];
-    }
-}
-
 void step(struct sim *sim, real_t dt_max)
 {
   real_t dt = compute_dt(sim);
@@ -533,8 +366,7 @@ void step(struct sim *sim, real_t dt_max)
   compute_fluxes(sim, IX);
   compute_fluxes(sim, IY);
   cells_update(sim, dt);
-  fill_boundaries_absorbing(sim, IX);
-  fill_boundaries_absorbing(sim, IY);
+  fill_boundaries(sim);
   cons_to_prim(sim);
   // printf("t: %lf\tdt: %.3e\n", sim->t, dt);
 }
