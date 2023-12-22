@@ -1,18 +1,18 @@
 #include "type.h"
 
-#define for_each_cells_x(j)       for(u64 j=sim->grid.jmin; j < sim->grid.jmax; j++)
-#define for_each_cells_y(i)       for(u64 i=sim->grid.imin; i < sim->grid.imax; i++)
-#define for_each_cells_and_ghost_x(j)    for(u64 j=0; j < sim->grid.Nx_tot; j++)
-#define for_each_cells_and_ghost_y(i)    for(u64 i=0; i < sim->grid.Ny_tot; i++)
-#define for_each_interfaces_x(j)  for(u64 j=sim->grid.imin-1; j < sim->grid.jmax+1; j++)
-#define for_each_interfaces_y(i)  for(u64 i=sim->grid.jmin-1; i < sim->grid.imax+1; i++)
+#define for_each_cells_x(j)            for(u64 j=sim->grid.jmin  ; j < sim->grid.jmax  ; j++)
+#define for_each_cells_y(i)            for(u64 i=sim->grid.imin  ; i < sim->grid.imax  ; i++)
+#define for_each_cells_and_ghost_x(j)  for(u64 j=0               ; j < sim->grid.Nx_tot; j++)
+#define for_each_cells_and_ghost_y(i)  for(u64 i=0               ; i < sim->grid.Ny_tot; i++)
+#define for_each_interfaces_x(j)       for(u64 j=sim->grid.imin-1; j < sim->grid.jmax+1; j++)
+#define for_each_interfaces_y(i)       for(u64 i=sim->grid.jmin-1; i < sim->grid.imax+1; i++)
 #define cell_id(i,j) (i*sim->grid.Nx_tot + j)
 
 #define DECLARE_PSTATE_VAR                  \
-        double *rho = sim->pstate.rho;      \
-        double *u   = sim->pstate.u;        \
-        double *v   = sim->pstate.v;        \
-        double *p   = sim->pstate.p;
+        double *rho   = sim->pstate.rho;    \
+        double *u     = sim->pstate.u;      \
+        double *v     = sim->pstate.v;      \
+        double *p     = sim->pstate.p;
 
 #define DECLARE_CSTATE_VAR                  \
         double *rho   = sim->cstate.rho;    \
@@ -52,12 +52,12 @@ struct grid {
   real_t xmin, ymin;
   real_t xmax, ymax;
 
-  u32 Nx, Ny;
-  u32 Nx_tot, Ny_tot;
-  u32 gx, gy;
-  real_t dx, dy;
+  u32    Nx,     Ny;
+  u32    Nx_tot, Ny_tot;
+  u32    gx,     gy;
+  real_t dx,     dy;
 
-  real_t *vertex_x, *vertex_y;
+  real_t *vertex_x,     *vertex_y;
   real_t *cellcenter_x, *cellcenter_y;
 
   u32 jmin, imin;
@@ -137,6 +137,7 @@ void init_state(struct sim *sim)
     for_each_cells_and_ghost_x(j)
     {
       const u64 id = cell_id(i,j);
+      // if(sim->grid.cellcenter_y[id] < 0.5 * (sim->grid.ymax + sim->grid.ymin)){
       if(sim->grid.cellcenter_x[id] < 0.5 * (sim->grid.xmax + sim->grid.xmin)){
         rho[id] = 1.0;
         u[id]   = 0;
@@ -161,15 +162,15 @@ struct grid init_grid(u32 Nx, u32 Ny, u32 gx, u32 gy)
   const real_t dy = (ymax - ymin) / Ny;
 
   struct grid grid;
-  grid.xmin = xmin; grid.ymin = ymin;
-  grid.xmax = xmax; grid.ymax = ymax;
+  grid.xmin = xmin;         grid.ymin = ymin;
+  grid.xmax = xmax;         grid.ymax = ymax;
 
   grid.Nx_tot = Nx + 2*gx;  grid.Ny_tot = Ny + 2*gy;
-  grid.Nx = Nx;             grid.Ny = Ny;
-  grid.dx = dx;             grid.dy = dy;
-  grid.gx = gx;             grid.gy = gy;
-  grid.jmin = gx;           grid.imin = gy;
-  grid.jmax = Nx + gx;      grid.imax = Ny + gy;
+  grid.Nx     = Nx;         grid.Ny     = Ny;
+  grid.dx     = dx;         grid.dy     = dy;
+  grid.gx     = gx;         grid.gy     = gy;
+  grid.jmin   = gx;         grid.imin   = gy;
+  grid.jmax   = Nx + gx;    grid.imax   = Ny + gy;
 
   grid.cellcenter_x = (real_t*)malloc(grid.Nx_tot * grid.Ny_tot * sizeof(real_t));
   grid.cellcenter_y = (real_t*)malloc(grid.Nx_tot * grid.Ny_tot * sizeof(real_t));
@@ -177,6 +178,8 @@ struct grid init_grid(u32 Nx, u32 Ny, u32 gx, u32 gy)
     for(u64 j=0; j < grid.Nx_tot; j++){
       grid.cellcenter_x[i * grid.Nx_tot + j] = xmin + (0.5 - gx + j) * dx;
       grid.cellcenter_y[i * grid.Nx_tot + j] = ymin + (0.5 - gy + i) * dy;
+      // printf("%lf\t%lf\n", grid.cellcenter_x[i * grid.Nx_tot + j],
+      //                      grid.cellcenter_y[i * grid.Nx_tot + j]);
     }
   }
 
@@ -184,8 +187,8 @@ struct grid init_grid(u32 Nx, u32 Ny, u32 gx, u32 gy)
   grid.vertex_y = (real_t*)malloc((grid.Nx_tot+1) * (grid.Ny_tot+1) * sizeof(real_t));
   for(u64 i=0; i < grid.Ny_tot+1; i++){
     for(u64 j=0; j < grid.Nx_tot+1; j++){
-      grid.vertex_x[i * (grid.Nx_tot+1) + j] = xmin + (j - gx) * dx;
-      grid.vertex_y[i * (grid.Nx_tot+1) + j] = ymin + (i - gy) * dy;
+      grid.vertex_x[i * (grid.Nx_tot+1) + j] = xmin + (j - (real_t)gx) * dx;
+      grid.vertex_y[i * (grid.Nx_tot+1) + j] = ymin + (i - (real_t)gy) * dy;
     }
   }
 
@@ -211,15 +214,15 @@ struct sim init_sim(u32 Nx, u32 Ny)
   const u32 gx = 2, gy = 2;
   sim.grid = init_grid(Nx, Ny, gx, gy);
   sim.gamma = 1.4;
-  sim.cfl = 0.1;
+  sim.cfl = 0.02;
   sim.t = 0.0;
 
-  alloc_state(&sim.cstate, sim.grid.Nx_tot * sim.grid.Ny_tot);
-  alloc_state(&sim.pstate, sim.grid.Nx_tot * sim.grid.Ny_tot);
-  alloc_state(&sim.slope_x,  sim.grid.Nx_tot * sim.grid.Ny_tot);
-  alloc_state(&sim.slope_y,  sim.grid.Nx_tot * sim.grid.Ny_tot);
-  alloc_state(&sim.flux_x, sim.grid.Nx_tot * sim.grid.Ny_tot);
-  alloc_state(&sim.flux_y, sim.grid.Nx_tot * sim.grid.Ny_tot);
+  alloc_state(&sim.cstate,  sim.grid.Nx_tot * sim.grid.Ny_tot);
+  alloc_state(&sim.pstate,  sim.grid.Nx_tot * sim.grid.Ny_tot);
+  alloc_state(&sim.slope_x, sim.grid.Nx_tot * sim.grid.Ny_tot);
+  alloc_state(&sim.slope_y, sim.grid.Nx_tot * sim.grid.Ny_tot);
+  alloc_state(&sim.flux_x,  sim.grid.Nx_tot * sim.grid.Ny_tot);
+  alloc_state(&sim.flux_y,  sim.grid.Nx_tot * sim.grid.Ny_tot);
 
   return sim;
 }
@@ -228,9 +231,9 @@ void free_state(void *state)
 {
   struct pstate *s = (struct pstate*)state;
   free(s->rho);
-  free(s->u  );
-  free(s->v  );
-  free(s->p  );
+  free(s->u);
+  free(s->v);
+  free(s->p);
 }
 
 void free_sim(struct sim *sim)
@@ -310,25 +313,29 @@ struct fcell riemann_hllc(struct pcell *restrict left, struct pcell *restrict ri
   real_t etotstarr = ((SR-ur)*etotr-pr*ur+ptotstar*ustar)/(SR-ustar);
     
   // Sample the solution at x/t=0
-  real_t ro, uo, ptoto, etoto;
+  real_t ro, uo, vo, ptoto, etoto;
   if (SL > 0) {
     ro=rl;
     uo=ul;
+    vo=vl;
     ptoto=pl;
     etoto=etotl;
   } else if (ustar > 0) {
     ro=rstarl;
     uo=ustar;
+    vo=vl;
     ptoto=ptotstar;
     etoto=etotstarl;
   } else if (SR > 0) {
     ro=rstarr;
     uo=ustar;
+    vo=vr;
     ptoto=ptotstar;
     etoto=etotstarr;
   } else {
     ro=rr;
     uo=ur;
+    vo=vr;
     ptoto=pr;
     etoto=etotr;
   }
@@ -337,7 +344,7 @@ struct fcell riemann_hllc(struct pcell *restrict left, struct pcell *restrict ri
   // Compute the Godunov flux
   flux.rho   = ro*uo;
   flux.rho_u = ro*uo*uo+ptoto;
-  flux.rho_v = (flux.rho > 0.0) ? flux.rho*vl : flux.rho*vr;
+  flux.rho_v = flux.rho*vo;
   flux.E = (etoto+ptoto)*uo;
 
   return flux;
@@ -470,6 +477,7 @@ void fill_boundaries_absorbing(struct sim *sim, enum dir dir)
   DECLARE_CSTATE_VAR
   u64 imaxl, jmaxl, lo;
   u64 iminr, imaxr, jminr, jmaxr, hi;
+  
   if(dir == IX){
     imaxl = sim->grid.Ny_tot;
     jmaxl = sim->grid.gx;
@@ -478,7 +486,7 @@ void fill_boundaries_absorbing(struct sim *sim, enum dir dir)
     jminr = sim->grid.Nx_tot - sim->grid.gx;
     jmaxr = sim->grid.Nx_tot;
     lo    = jmaxl;
-    hi    = jminr;
+    hi    = jminr-1;
   }
   else{
     imaxl = sim->grid.gy;
@@ -488,7 +496,7 @@ void fill_boundaries_absorbing(struct sim *sim, enum dir dir)
     jminr = 0;
     jmaxr = sim->grid.Nx_tot;
     lo    = imaxl;
-    hi    = iminr;
+    hi    = iminr-1;
   }
 
   // left side
@@ -496,7 +504,7 @@ void fill_boundaries_absorbing(struct sim *sim, enum dir dir)
   for(u64 i=0; i < imaxl; i++)
     for(u64 j=0; j < jmaxl; j++){
       const u64 id    = cell_id(i,j);
-      const u64 id_lo = cell_id(i,lo);
+      const u64 id_lo = (dir == IX) ? cell_id(i,lo) : cell_id(lo,j);
       rho  [id] = rho  [id_lo];
       rho_u[id] = rho_u[id_lo];
       rho_v[id] = rho_v[id_lo];
@@ -507,7 +515,7 @@ void fill_boundaries_absorbing(struct sim *sim, enum dir dir)
   for(u64 i=iminr; i < imaxr; i++)
     for(u64 j=jminr; j < jmaxr; j++){
       const u64 id    = cell_id(i,j);
-      const u64 id_hi = cell_id(i,hi-1);
+      const u64 id_hi = (dir == IX) ? cell_id(i,hi) : cell_id(hi,j);
       rho  [id] = rho  [id_hi];
       rho_u[id] = rho_u[id_hi];
       rho_v[id] = rho_v[id_hi];
@@ -528,6 +536,7 @@ void step(struct sim *sim, real_t dt_max)
   fill_boundaries_absorbing(sim, IX);
   fill_boundaries_absorbing(sim, IY);
   cons_to_prim(sim);
+  // printf("t: %lf\tdt: %.3e\n", sim->t, dt);
 }
 
 void run(struct sim *sim, real_t tmax)
