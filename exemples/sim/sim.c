@@ -7,7 +7,7 @@
 #define IMG_FACTOR 64
 #define IMG_WIDTH  (10 * IMG_FACTOR)
 #define IMG_HEIGHT (10  * IMG_FACTOR)
-#define NB_POINTS 128
+#define NB_POINTS 10
 
 void compute_minmax(real_t *out_min, real_t *out_max, struct grid *grid, real_t *values)
 {
@@ -69,7 +69,7 @@ int main(int argc, char** argv)
   init_state(&sim);
 
   struct pcolor_state pcolor_state = pcolor_state_alloc(pixels, IMG_WIDTH, IMG_HEIGHT);
-  pcolor_state.show_edge = false;
+  // pcolor_state.show_edge = false;
 
   const u64 offset = 0; sim.grid.gy*sim.grid.Nx_tot + sim.grid.gx;
   struct callback_args callback_args = {.pcolor_state = &pcolor_state, .sim=&sim, .offset=offset};

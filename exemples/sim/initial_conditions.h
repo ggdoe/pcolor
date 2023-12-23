@@ -52,7 +52,7 @@ void init_kelvin_helmholtz(struct sim *sim, enum dir dir)
 {
   DECLARE_PSTATE_VAR
   sim->t = 0;
-  sim->boundary[IX] = PERIODIC;
+  sim->boundary[IX] = ABSORBING;
   sim->boundary[IY] = PERIODIC;
 
   const real_t *cell_center = (dir == IY) ? sim->grid.cellcenter_x : sim->grid.cellcenter_y;

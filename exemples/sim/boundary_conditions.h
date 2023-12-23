@@ -47,22 +47,25 @@ void boundary_periodic(struct sim *sim, enum dir dir)
   }
 
   // left side
-  #pragma omp parallel for collapse(2)
+  // #pragma omp parallel for collapse(2)
   for(u64 i=0; i < imaxl; i++)
     for(u64 j=0; j < jmaxl; j++){
       const u64 id    = cell_id(i,j);
       const u64 id_l = (dir == IX) ? cell_id(i,hi-lo+j) : cell_id(hi-lo+i,j);
+      printf("%ld:%ld\t%ld\t%ld\t%ld\n", i,j, hi-lo+i, sim->grid.jmin, sim->grid.jmax);
       rho  [id] = rho  [id_l];
       rho_u[id] = rho_u[id_l];
       rho_v[id] = rho_v[id_l];
       E    [id] = E    [id_l];
     }
   // right side
-  #pragma omp parallel for collapse(2)
+  // #pragma omp parallel for collapse(2)
   for(u64 i=iminr; i < imaxr; i++)
     for(u64 j=jminr; j < jmaxr; j++){
       const u64 id    = cell_id(i,j);
-      const u64 id_r = (dir == IX) ? cell_id(i,lo+j) : cell_id(lo+j,j);
+      const u64 id_r = (dir == IX) ? cell_id(i,lo+j) : cell_id(lo+i,j);
+      printf("%ld:%ld\t%ld\t%ld\t%ld\n", i,j, lo+i, sim->grid.jmin, sim->grid.jmax);
+      le probleme est là :: ex en IY pour i=iminr (ex 12), on veut i=gy (donc 2), là on a lo+j cad 14 --> out of bound
       rho  [id] = rho  [id_r];
       rho_u[id] = rho_u[id_r];
       rho_v[id] = rho_v[id_r];
