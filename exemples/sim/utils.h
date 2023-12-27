@@ -4,7 +4,7 @@ enum dir{
 };
 
 enum boundary_type{
-  ABSORBING, PERIODIC
+  ABSORBING, PERIODIC, REFLECTING,
 };
 
 struct cstate{
@@ -25,16 +25,16 @@ struct grid {
   real_t xmin, ymin;
   real_t xmax, ymax;
 
-  u32    Nx,     Ny;
-  u32    Nx_tot, Ny_tot;
-  u32    gx,     gy;
+  int64_t    Nx,     Ny;
+  int64_t    Nx_tot, Ny_tot;
+  int64_t    gx,     gy;
   real_t dx,     dy;
 
   real_t *vertex_x,     *vertex_y;
   real_t *cellcenter_x, *cellcenter_y;
 
-  u32 jmin, imin;
-  u32 jmax, imax;
+  int64_t jmin, imin;
+  int64_t jmax, imax;
 };
 
 struct sim{
@@ -71,7 +71,7 @@ struct fcell{
 #define for_each_cells_and_ghost_y(i)  for(u64 i=0               ; i < sim->grid.Ny_tot; i++)
 #define for_each_interfaces_x(j)       for(u64 j=sim->grid.imin-1; j < sim->grid.jmax+1; j++)
 #define for_each_interfaces_y(i)       for(u64 i=sim->grid.jmin-1; i < sim->grid.imax+1; i++)
-#define cell_id(i,j) (i*sim->grid.Nx_tot + j)
+#define cell_id(i,j) ((i)*sim->grid.Nx_tot + (j))
 
 #define DECLARE_PSTATE_VAR                  \
         double *rho   = sim->pstate.rho;    \
