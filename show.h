@@ -23,6 +23,7 @@ struct show_state {
     bool redraw;
     bool draw_long_click_zone;
     bool quit;
+    bool pause; // animate only
 };
 
 inline static 
@@ -151,6 +152,9 @@ void manage_event(struct show_state *ss)
                     case SDLK_q:
                         ss->quit = true;
                         break;
+                    case SDLK_p:
+                        ss->pause = !ss->pause;
+                        break;
                 }
                 break;
             case SDL_QUIT:
@@ -186,6 +190,8 @@ struct show_state init_show_state(uint32_t *pixels, int width, int height)
     ss.pic_w = width;
     ss.pic_h = height;
     ss.redraw = true;
+    ss.quit = false;
+    ss.pause = false;
     
     ss.texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, width, height);
     SDL_UpdateTexture(ss.texture, NULL, pixels, width * sizeof(uint32_t));
@@ -250,7 +256,8 @@ void animate(uint32_t *pixels, int width, int height, double target_fps, callbac
                         custom_event[i].callback(custom_event[i].callback_args);
             }
         }
-        callback(callback_args);
+        if(!ss.pause)
+            callback(callback_args);
         SDL_UpdateTexture(ss.texture, NULL, pixels, width * sizeof(uint32_t));
         draw_state(&ss);
 
