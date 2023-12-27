@@ -100,9 +100,9 @@ int main(int argc, char **argv)
             C[i] = cmap_nipy_spectral((double)rand()/RAND_MAX);
         }
 
-        struct pcolor_state pstate = pcolor_state_alloc(pixels, IMG_HEIGHT, IMG_HEIGHT);
+        struct pcolor_config pstate = pcolor_config_alloc(pixels, IMG_HEIGHT, IMG_HEIGHT);
         pstate.ld_pixels = IMG_WIDTH;
-        pcolor_fill_state(&pstate, x, y, w, h);
+        pcolor_config_fill(&pstate, x, y, w, h);
         pstate.show_edge = false;
         pcolor(&pstate, C);
         // pcolor_nostate(pixels, IMG_WIDTH, IMG_HEIGHT, x, y, w, h, C, true, 0xFFFFFFFF, 0xFF111111);

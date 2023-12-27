@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include "cmap.h"
 
-struct pcolor_state{
+struct pcolor_config{
     int w_pixels;
     int h_pixels;
     int ld_pixels;
@@ -110,9 +110,9 @@ static int _pcolor_max_int(const int *x, int n)
     return max;
 }
 
-struct pcolor_state pcolor_state_alloc(uint32_t *pixels, int w_pixels, int h_pixels)
+struct pcolor_config pcolor_config_alloc(uint32_t *pixels, int w_pixels, int h_pixels)
 {
-    struct pcolor_state state = {
+    struct pcolor_config state = {
         .pixels = pixels,
         .w_pixels = w_pixels,
         .h_pixels = h_pixels,
@@ -126,14 +126,14 @@ struct pcolor_state pcolor_state_alloc(uint32_t *pixels, int w_pixels, int h_pix
     return state;
 }
 
-void pcolor_free(struct pcolor_state *state)
+void pcolor_free(struct pcolor_config *state)
 {
     free(state->pixel_type);
     free(state->pixel_color_id);
 }
 
 // Nx : number cell x-axis      Ny : number cells y-axis
-void pcolor_fill_state(struct pcolor_state *state, double *vertex_x, double *vertex_y, int Nx, int Ny, int ld)
+void pcolor_config_fill(struct pcolor_config *state, double *vertex_x, double *vertex_y, int Nx, int Ny, int ld)
 {
     const int w_pixels  = state->w_pixels;
     const int h_pixels  = state->h_pixels;
@@ -184,7 +184,7 @@ void pcolor_fill_state(struct pcolor_state *state, double *vertex_x, double *ver
     }
 }
 
-void pcolor(struct pcolor_state *state, uint32_t *color_grid)
+void pcolor(struct pcolor_config *state, uint32_t *color_grid)
 {
     for(int i = 0; i < state->h_pixels; i++)
         for(int j = 0; j < state->w_pixels; j++)
@@ -205,8 +205,11 @@ void pcolor(struct pcolor_state *state, uint32_t *color_grid)
         }
 }
 
-void pcolor_real(struct pcolor_state *state, real_t *values, real_t min, real_t max)
+typedef uint32_t (*cmap_function_t)(double);
+void pcolor_real(struct pcolor_config *state, double *values, double min, double max, cmap_function_t cmap)
 {
+    #define CELLCOLOR cmap((values[state->pixel_color_id[id_color]] - min)/(max - min));
+
     #pragma omp parallel for collapse(2)
     for(int i = 0; i < state->h_pixels; i++)
         for(int j = 0; j < state->w_pixels; j++)
@@ -214,7 +217,6 @@ void pcolor_real(struct pcolor_state *state, real_t *values, real_t min, real_t 
             const int id_pixels = i*state->ld_pixels + j;
             const int id_color  = i*state-> w_pixels + j;
             switch (state->pixel_type[id_color]){
-                #define CELLCOLOR cmap_nipy_spectral((values[state->pixel_color_id[id_color]] - min)/(max - min));
                 case PCOLOR_TYPE_CELL:
                     state->pixels[id_pixels] = CELLCOLOR;
                     break;
@@ -224,9 +226,9 @@ void pcolor_real(struct pcolor_state *state, real_t *values, real_t min, real_t 
                 case PCOLOR_TYPE_OUTSIDE:
                     state->pixels[id_pixels] = state->color_outside;
                     break;
-                #undef CELLCOLOR
             }
         }
+    #undef CELLCOLOR
 }
 
 void pcolor_nostate(uint32_t *pixels, int w_pixels, int h_pixels, double *vertex_x, double *vertex_y, int Nx, int Ny, uint32_t *cells_color, bool show_edge, uint32_t color_egde, uint32_t color_outside) 

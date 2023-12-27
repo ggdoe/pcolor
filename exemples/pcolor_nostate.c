@@ -39,7 +39,7 @@ int main(int argc, char **argv)
       C[i] = cmap_nipy_spectral((double)rand()/RAND_MAX);
   }
 
-  pcolor_nostate(pixels, IMG_WIDTH, IMG_HEIGHT, x, y, w, h, C, true, 0xFFFFFFFF, 0xFF111111);
+  pcolor_nostate(pixels, IMG_WIDTH, IMG_HEIGHT, x, y, w-1, h-1, C, true, 0xFFFFFFFF, 0xFF111111);
 
   show(pixels, IMG_WIDTH, IMG_HEIGHT);
 

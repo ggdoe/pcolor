@@ -38,12 +38,12 @@ int main(int argc, char **argv)
       C[i] = cmap_nipy_spectral((double)rand()/RAND_MAX);
   }
 
-  struct pcolor_state pstate = pcolor_state_alloc(pixels + 100, IMG_HEIGHT, IMG_HEIGHT);
+  struct pcolor_config pstate = pcolor_config_alloc(pixels + 100, IMG_HEIGHT, IMG_HEIGHT);
 
   // shifting with leading dimension parameter
   pstate.ld_pixels = IMG_WIDTH;
   
-  pcolor_fill_state(&pstate, x, y, w, h);
+  pcolor_config_fill(&pstate, x, y, w-1, h-1, w-1);
   pstate.show_edge = false;
 
   pcolor(&pstate, C);

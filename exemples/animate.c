@@ -20,7 +20,7 @@ struct callback_args
 {
   int w;
   int h;
-  struct pcolor_state *pstate;
+  struct pcolor_config *pstate;
   int map;
   double deform_factor;
 };
@@ -77,12 +77,12 @@ void callback_cycle_mapping(void *args)
       }
       break;
   }
-  pcolor_fill_state(s->pstate, x, y, w, h);
+  pcolor_config_fill(s->pstate, x, y, w-1, h-1, w-1);
 }
 
 void callback_toggle_edge(void *args)
 {
-  struct pcolor_state *pstate = args;
+  struct pcolor_config *pstate = args;
   pstate->show_edge = !pstate->show_edge;
 }
 void callback_inc_h(void *args)
@@ -131,7 +131,7 @@ int main(int argc, char **argv)
   memset(pixels, 0xFFFFFFFF, IMG_WIDTH * IMG_HEIGHT * sizeof(uint32_t));
 
   // init pcolor state
-  struct pcolor_state pstate = pcolor_state_alloc(pixels, IMG_WIDTH, IMG_HEIGHT);
+  struct pcolor_config pstate = pcolor_config_alloc(pixels, IMG_WIDTH, IMG_HEIGHT);
   // pstate.show_edge = false;
   pstate.color_egde = 0xFF000000;
 
