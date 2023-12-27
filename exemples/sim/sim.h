@@ -98,7 +98,7 @@ struct sim init_sim(u32 Nx, u32 Ny)
   const u32 gx = 2, gy = 2;
   sim.grid = init_grid(Nx, Ny, gx, gy);
   sim.gamma = 1.4;
-  sim.cfl = 0.01;
+  sim.cfl = 0.1;
   sim.t = 0.0;
 
   alloc_state(&sim.cstate,  sim.grid.Nx_tot * sim.grid.Ny_tot);
@@ -368,7 +368,7 @@ void step(struct sim *sim, real_t dt_max)
   cells_update(sim, dt);
   fill_boundaries(sim);
   cons_to_prim(sim);
-  // printf("t: %lf\tdt: %.3e\n", sim->t, dt);
+  // printf("t: %.4lf\tdt: %.3e\n", sim->t, dt);
 }
 
 void run(struct sim *sim, real_t tmax)
