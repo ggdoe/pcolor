@@ -142,7 +142,7 @@ int main(int argc, char** argv)
   struct custom_keyevent kevent[5]; const int nb_custom_event = sizeof(kevent)/sizeof(struct custom_keyevent);
   kevent[0] = (struct custom_keyevent){.key=SDLK_SPACE, .callback=callback_update,          .callback_args=&callback_args};
   kevent[1] = (struct custom_keyevent){.key=SDLK_s,     .callback=callback_cycle_drawstate, .callback_args=&callback_args};
-  kevent[2] = (struct custom_keyevent){.key=SDLK_r,     .callback=callback_init,            .callback_args=&callback_args};
+  kevent[2] = (struct custom_keyevent){.key=SDLK_i,     .callback=callback_init,            .callback_args=&callback_args};
   kevent[3] = (struct custom_keyevent){.key=SDLK_m,     .callback=callback_minmax,          .callback_args=&callback_args};
   kevent[4] = (struct custom_keyevent){.key=SDLK_e,     .callback=callback_cycle_edge,      .callback_args=&callback_args};
 
