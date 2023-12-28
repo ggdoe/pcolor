@@ -8,15 +8,24 @@ void init_sod(struct sim *sim, enum dir dir);
 void init_kelvin_helmholtz(struct sim *sim, enum dir dir);
 void init_blast(struct sim *sim);
 
-void init_state(struct sim *sim)
-{
-  sim->t = 0;
-  
-  // init_sod(sim, IX);
-  init_kelvin_helmholtz(sim, IX);
-  // init_blast(sim);
+typedef void(*initial_condition_t)(struct sim*, enum dir);
 
-  prim_to_cons(sim);
+void initial_condition(struct sim *sim, const char* init_name)
+{
+  const char *avail_init[] = {"sod", "blast", "kelvin-helmholtz"};
+  initial_condition_t avail_init_fct[] = {init_sod, (initial_condition_t)init_blast, init_kelvin_helmholtz};
+
+  for(int i=0; i < sizeof(avail_init)/sizeof(char*); i++)
+    if(!strncmp(avail_init[i], init_name, 30))
+    {
+      avail_init_fct[i](sim, IX);
+      return;
+    }
+  printf("unknown initial condition, available: \n\t");
+  for(int i=0; i < sizeof(avail_init)/sizeof(char*); i++)
+    printf("%s  ", avail_init[i]);
+  printf("\n");
+  exit(1);
 }
 
 void init_blast(struct sim *sim)

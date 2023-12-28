@@ -41,6 +41,7 @@ struct callback_args{
   u64 offset;
   real_t min, max;
   cmap_function_t cmap;
+  const char *initial_condition_name;
 };
 
 // do nothing
@@ -112,7 +113,7 @@ void callback_cycle_edge(void *args)
 void callback_init(void *args)
 {
   struct callback_args *s = args;
-  init_state(s->sim);
+  initial_condition(s->sim, s->initial_condition_name);
   callback_minmax(args);
 }
 
@@ -125,7 +126,8 @@ int main(int argc, char** argv)
 
   // init fluid simulation on cartesian grid
   struct sim sim = init_sim(NB_POINTS, NB_POINTS);
-  init_state(&sim);
+  const char* initial_condition_name = "kelvin-helmholtz";
+  initial_condition(&sim, initial_condition_name);
 
   // // offset to avoid ghost cells
   const u64 offset =  sim.grid.gy*sim.grid.Nx_tot + sim.grid.gx;
@@ -136,7 +138,8 @@ int main(int argc, char** argv)
   pcolor_config_fill(&pcolor_config, sim.grid.vertex_x+offset, sim.grid.vertex_y+offset, sim.grid.Nx, sim.grid.Ny, sim.grid.Nx_tot);
 
   // callback functions arguments
-  struct callback_args callback_args = {.state_to_draw=sim.pstate.rho, .pcolor_config = &pcolor_config, .sim=&sim, .offset=offset, .cmap=cmap_cool_warm};
+  struct callback_args callback_args = {.state_to_draw=sim.pstate.rho, .pcolor_config = &pcolor_config, 
+                                        .sim=&sim, .offset=offset, .cmap=cmap_cool_warm, .initial_condition_name=initial_condition_name};
 
   // custom key event
   struct custom_keyevent kevent[5]; const int nb_custom_event = sizeof(kevent)/sizeof(struct custom_keyevent);

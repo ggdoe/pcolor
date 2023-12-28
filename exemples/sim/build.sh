@@ -14,5 +14,5 @@ out2="slice1d.out"
 
 set -xe
 $CC $CFLAGS -I$IDIR -o $out1 $SRC1 $LIB
-# $CC $CFLAGS -I$IDIR -o $out2 $SRC2 $LIB
+$CC $CFLAGS -I$IDIR -o $out2 $SRC2 $LIB
 
