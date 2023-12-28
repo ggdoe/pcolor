@@ -16,7 +16,7 @@ int main(int argc, char** argv)
   fill(pixels, IMG_WIDTH, IMG_HEIGHT, 255, 255, 255);
 
   struct sim sim = init_sim(NB_POINTS_X, NB_POINTS_Y);
-  init_state(&sim);
+  init_sod(&sim, IX);
 
   run(&sim, 0.2);
 
