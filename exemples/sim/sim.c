@@ -51,39 +51,41 @@ void callback_minmax(void *args)
 {
   struct callback_args *s = args;
   compute_minmax(&s->min, &s->max, &s->sim->grid, s->state_to_draw);
-  printf("t: %lf\tmin: %lf\t%lf\n", s->sim->t, s->min, s->max);
+  printf("\tminmax: %lf, %lf\n", s->min, s->max);
   pcolor_real(s->pcolor_config, s->state_to_draw+s->offset, s->min, s->max, s->cmap);
 }
 
-// cycle state to draw (rho, p, u, v, E)
+// cycle state to draw (rho, u, v, p, E)
 void callback_cycle_drawstate(void *args)
 {
   struct callback_args *s = args;
   static u64 i=0;
-  switch(++i%5)
+  printf("\x1b[2K"); // clear line
+  switch(i++)
   {
     case 0:
-      printf("state rho\n");
+      printf("\rstate rho");
       s->state_to_draw = s->sim->pstate.rho;
       break;
     case 1:
-      printf("state p\n");
-      s->state_to_draw = s->sim->pstate.p;
-      break;
-    case 2:
-      printf("state u\n");
+      printf("\rstate u  ");
       s->state_to_draw = s->sim->pstate.u;
       break;
-    case 3:
-      printf("state v\n");
+    case 2:
+      printf("\rstate v  ");
       s->state_to_draw = s->sim->pstate.v;
       break;
+    case 3:
+      printf("\rstate p  ");
+      s->state_to_draw = s->sim->pstate.p;
+      break;
     case 4:
-      printf("state E\n");
+      printf("\rstate E  ");
       s->state_to_draw = s->sim->cstate.E;
       break;
   }
   callback_minmax(args);
+  i = i%5;
 }
 
 // callback that is call at each frame
@@ -91,7 +93,18 @@ void callback_update(void *args)
 {
   struct callback_args *s = args;
   run(s->sim, s->sim->t + 0.01);
-  printf("t: %lf\n", s->sim->t);
+  printf("\rt: %.4lf", s->sim->t);fflush(stdout);
+  pcolor_real(s->pcolor_config, s->state_to_draw+s->offset, s->min, s->max, s->cmap);
+
+  // slice_x on middle of the y axis
+  // plot(s->pcolor_config->pixels, IMG_WIDTH, IMG_HEIGHT, s->state_to_draw+s->sim->grid.Ny_tot*s->sim->grid.Nx_tot/2 + s->sim->grid.gx, s->sim->grid.Nx, NULL, 0xFFFFFFFF);
+}
+
+// activate or deactivate edges
+void callback_cycle_edge(void *args)
+{
+  struct callback_args *s = args;
+  s->pcolor_config->show_edge = !s->pcolor_config->show_edge;
   pcolor_real(s->pcolor_config, s->state_to_draw+s->offset, s->min, s->max, s->cmap);
 }
 
@@ -108,7 +121,7 @@ void callback_init(void *args)
 int main(int argc, char** argv)
 {
   // create pixel array
-  uint32_t *pixels = malloc(IMG_WIDTH * IMG_HEIGHT * sizeof(uint32_t));
+  uint32_t *pixels = MALLOC(IMG_WIDTH * IMG_HEIGHT * sizeof(uint32_t));
 
   // init fluid simulation on cartesian grid
   struct sim sim = init_sim(NB_POINTS, NB_POINTS);
@@ -126,14 +139,15 @@ int main(int argc, char** argv)
   struct callback_args callback_args = {.state_to_draw=sim.pstate.rho, .pcolor_config = &pcolor_config, .sim=&sim, .offset=offset, .cmap=cmap_cool_warm};
 
   // custom key event
-  struct custom_keyevent kevent[4]; const int nb_custom_event = sizeof(kevent)/sizeof(struct custom_keyevent);
+  struct custom_keyevent kevent[5]; const int nb_custom_event = sizeof(kevent)/sizeof(struct custom_keyevent);
   kevent[0] = (struct custom_keyevent){.key=SDLK_SPACE, .callback=callback_update,          .callback_args=&callback_args};
   kevent[1] = (struct custom_keyevent){.key=SDLK_s,     .callback=callback_cycle_drawstate, .callback_args=&callback_args};
   kevent[2] = (struct custom_keyevent){.key=SDLK_r,     .callback=callback_init,            .callback_args=&callback_args};
   kevent[3] = (struct custom_keyevent){.key=SDLK_m,     .callback=callback_minmax,          .callback_args=&callback_args};
+  kevent[4] = (struct custom_keyevent){.key=SDLK_e,     .callback=callback_cycle_edge,      .callback_args=&callback_args};
 
   // compute minmax for the cmap function
-  callback_minmax(&callback_args);
+  callback_cycle_drawstate(&callback_args);
 
   // start window and animate the simulation
   animate(pixels, IMG_WIDTH, IMG_HEIGHT, 60.0, callback_update, &callback_args, kevent, nb_custom_event);

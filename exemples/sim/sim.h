@@ -58,8 +58,8 @@ struct grid init_grid(u32 Nx, u32 Ny, u32 gx, u32 gy)
   grid.jmin   = gx;         grid.imin   = gy;
   grid.jmax   = Nx + gx;    grid.imax   = Ny + gy;
 
-  grid.cellcenter_x = (real_t*)malloc(grid.Nx_tot * grid.Ny_tot * sizeof(real_t));
-  grid.cellcenter_y = (real_t*)malloc(grid.Nx_tot * grid.Ny_tot * sizeof(real_t));
+  grid.cellcenter_x = (real_t*)MALLOC(grid.Nx_tot * grid.Ny_tot * sizeof(real_t));
+  grid.cellcenter_y = (real_t*)MALLOC(grid.Nx_tot * grid.Ny_tot * sizeof(real_t));
   for(u64 i=0; i < grid.Ny_tot; i++){
     for(u64 j=0; j < grid.Nx_tot; j++){
       grid.cellcenter_x[i * grid.Nx_tot + j] = xmin + (0.5 - gx + j) * dx;
@@ -67,8 +67,8 @@ struct grid init_grid(u32 Nx, u32 Ny, u32 gx, u32 gy)
     }
   }
 
-  grid.vertex_x = (real_t*)malloc((grid.Nx_tot+1) * (grid.Ny_tot+1) * sizeof(real_t));
-  grid.vertex_y = (real_t*)malloc((grid.Nx_tot+1) * (grid.Ny_tot+1) * sizeof(real_t));
+  grid.vertex_x = (real_t*)MALLOC((grid.Nx_tot+1) * (grid.Ny_tot+1) * sizeof(real_t));
+  grid.vertex_y = (real_t*)MALLOC((grid.Nx_tot+1) * (grid.Ny_tot+1) * sizeof(real_t));
   for(u64 i=0; i < grid.Ny_tot+1; i++){
     for(u64 j=0; j < grid.Nx_tot+1; j++){
       grid.vertex_x[i * (grid.Nx_tot+1) + j] = xmin + (j - (real_t)gx) * dx;
@@ -82,10 +82,10 @@ struct grid init_grid(u32 Nx, u32 Ny, u32 gx, u32 gy)
 void alloc_state(void *state, size_t n)
 {
   struct pstate *s = (struct pstate*)state;
-  s->rho = (real_t*)malloc(n * sizeof(real_t));
-  s->u   = (real_t*)malloc(n * sizeof(real_t));
-  s->v   = (real_t*)malloc(n * sizeof(real_t));
-  s->p   = (real_t*)malloc(n * sizeof(real_t));
+  s->rho = (real_t*)MALLOC(n * sizeof(real_t));
+  s->u   = (real_t*)MALLOC(n * sizeof(real_t));
+  s->v   = (real_t*)MALLOC(n * sizeof(real_t));
+  s->p   = (real_t*)MALLOC(n * sizeof(real_t));
   memset(s->rho, 0, n * sizeof(real_t));
   memset(s->u  , 0, n * sizeof(real_t));
   memset(s->v  , 0, n * sizeof(real_t));
@@ -279,9 +279,9 @@ void compute_slope(struct sim *sim)
   const u64 offset_x = 1;
   const u64 offset_y = sim->grid.Nx_tot;
 
-  #pragma omp parallel for
-  for_each_cells_y(i)
-    for_each_cells_x(j){
+  #pragma omp parallel for collapse(2)
+  for(u64 i=sim->grid.jmin-1; i < sim->grid.imax+1  ; i++)   // +1 for muscl hancock,
+    for(u64 j=sim->grid.imin-1; j < sim->grid.jmax+1  ; j++){// else just use for_each_interface
       const u64 id = cell_id(i,j);
       // x-dir
       sim->slope_x.rho[id] = limited_slope(rho, id, offset_x);
@@ -331,6 +331,43 @@ void compute_fluxes(struct sim *sim, enum dir dir)
     }
 }
 
+void reconstruct_muscl_hancock(struct sim *sim, real_t dt)
+{
+  DECLARE_PSTATE_VAR
+  const real_t dtdx = 0.5 * dt / sim->grid.dx;
+  const real_t dtdy = 0.5 * dt / sim->grid.dy;
+
+  #pragma omp parallel for collapse(2)
+  for(u64 i=sim->grid.jmin-1; i < sim->grid.imax+1  ; i++)
+    for(u64 j=sim->grid.imin-1; j < sim->grid.jmax+1  ; j++)
+    {
+      const u64 id = cell_id(i,j);
+      const real_t dxr = sim->slope_x.rho[id];
+      const real_t dxu = sim->slope_x.  u[id];
+      const real_t dxv = sim->slope_x.  v[id];
+      const real_t dxp = sim->slope_x.  p[id];
+
+      const real_t dyr = sim->slope_y.rho[id];
+      const real_t dyu = sim->slope_y.  u[id];
+      const real_t dyv = sim->slope_y.  v[id];
+      const real_t dyp = sim->slope_y.  p[id];
+
+      const real_t pr  = rho[id];
+      const real_t pu  =   u[id];
+      const real_t pv  =   v[id];
+      const real_t pp  =   p[id];
+    
+      rho[id] = pr + (- pu * dxr - pr * dxu) * dtdx
+                   + (- pv * dyr - pr * dyv) * dtdy;
+      u[id]   = pu + (- pu * dxu - dxp / pr) * dtdx
+                   + (- pv * dyu) * dtdy;
+      v[id]   = pv + (- pu * dxv) * dtdx
+                   + (- pv * dyv - dyp / pr) * dtdy;
+      p[id]   = pp + (- sim->gamma * pp * dxu - pu * dxp) * dtdx
+                   + (- sim->gamma * pp * dyv - pv * dyp) * dtdy;
+    }
+}
+
 void cells_update(struct sim *sim, real_t dt)
 {
   DECLARE_CSTATE_VAR
@@ -363,6 +400,7 @@ void step(struct sim *sim, real_t dt_max)
   sim->t += dt;
   
   compute_slope(sim);
+  reconstruct_muscl_hancock(sim, dt);
   compute_fluxes(sim, IX);
   compute_fluxes(sim, IY);
   cells_update(sim, dt);

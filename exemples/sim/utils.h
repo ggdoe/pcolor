@@ -69,8 +69,8 @@ struct fcell{
 #define for_each_cells_y(i)            for(u64 i=sim->grid.imin  ; i < sim->grid.imax  ; i++)
 #define for_each_cells_and_ghost_x(j)  for(u64 j=0               ; j < sim->grid.Nx_tot; j++)
 #define for_each_cells_and_ghost_y(i)  for(u64 i=0               ; i < sim->grid.Ny_tot; i++)
-#define for_each_interfaces_x(j)       for(u64 j=sim->grid.imin-1; j < sim->grid.jmax+1; j++)
-#define for_each_interfaces_y(i)       for(u64 i=sim->grid.jmin-1; i < sim->grid.imax+1; i++)
+#define for_each_interfaces_x(j)       for(u64 j=sim->grid.imin-1; j < sim->grid.jmax  ; j++)
+#define for_each_interfaces_y(i)       for(u64 i=sim->grid.jmin-1; i < sim->grid.imax  ; i++)
 #define cell_id(i,j) ((i)*sim->grid.Nx_tot + (j))
 
 #define DECLARE_PSTATE_VAR                  \
