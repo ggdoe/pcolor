@@ -231,7 +231,7 @@ void pcolor_real(struct pcolor_config *state, double *values, double min, double
     #undef CELLCOLOR
 }
 
-void pcolor_nostate(uint32_t *pixels, int w_pixels, int h_pixels, double *vertex_x, double *vertex_y, int Nx, int Ny, uint32_t *cells_color, bool show_edge, uint32_t color_egde, uint32_t color_outside) 
+void pcolor_noconfig(uint32_t *pixels, int w_pixels, int h_pixels, double *vertex_x, double *vertex_y, int Nx, int Ny, uint32_t *cells_color, bool show_edge, uint32_t color_egde, uint32_t color_outside) 
 {
     for (int i = 0; i < w_pixels * h_pixels; i++)
         pixels[i] = color_outside;
