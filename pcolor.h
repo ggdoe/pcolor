@@ -184,7 +184,8 @@ void pcolor_config_fill(struct pcolor_config *state, double *vertex_x, double *v
     }
 }
 
-void pcolor(struct pcolor_config *state, uint32_t *color_grid)
+// pcolor from color grid array (uint32_t argb)
+void pcolor_colorgrid(struct pcolor_config *state, uint32_t *color_grid)
 {
     for(int i = 0; i < state->h_pixels; i++)
         for(int j = 0; j < state->w_pixels; j++)
@@ -206,7 +207,7 @@ void pcolor(struct pcolor_config *state, uint32_t *color_grid)
 }
 
 typedef uint32_t (*cmap_function_t)(double);
-void pcolor_real(struct pcolor_config *state, double *values, double min, double max, cmap_function_t cmap)
+void pcolor(struct pcolor_config *state, double *values, double min, double max, cmap_function_t cmap)
 {
     #define CELLCOLOR cmap((values[state->pixel_color_id[id_color]] - min)/(max - min));
 

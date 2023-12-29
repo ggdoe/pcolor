@@ -53,7 +53,7 @@ void callback_minmax(void *args)
   struct callback_args *s = args;
   compute_minmax(&s->min, &s->max, &s->sim->grid, s->state_to_draw);
   printf("\tminmax: %lf, %lf\n", s->min, s->max);
-  pcolor_real(s->pcolor_config, s->state_to_draw+s->offset, s->min, s->max, s->cmap);
+  pcolor(s->pcolor_config, s->state_to_draw+s->offset, s->min, s->max, s->cmap);
 }
 
 // cycle state to draw (rho, u, v, p, E)
@@ -95,7 +95,7 @@ void callback_update(void *args)
   struct callback_args *s = args;
   run(s->sim, s->sim->t + 0.01);
   printf("\rt: %.4lf", s->sim->t);fflush(stdout);
-  pcolor_real(s->pcolor_config, s->state_to_draw+s->offset, s->min, s->max, s->cmap);
+  pcolor(s->pcolor_config, s->state_to_draw+s->offset, s->min, s->max, s->cmap);
 
   // slice_x on middle of the y axis
   // plot(s->pcolor_config->pixels, IMG_WIDTH, IMG_HEIGHT, s->state_to_draw+s->sim->grid.Ny_tot*s->sim->grid.Nx_tot/2 + s->sim->grid.gx, s->sim->grid.Nx, NULL, 0xFFFFFFFF);
@@ -106,7 +106,7 @@ void callback_cycle_edge(void *args)
 {
   struct callback_args *s = args;
   s->pcolor_config->show_edge = !s->pcolor_config->show_edge;
-  pcolor_real(s->pcolor_config, s->state_to_draw+s->offset, s->min, s->max, s->cmap);
+  pcolor(s->pcolor_config, s->state_to_draw+s->offset, s->min, s->max, s->cmap);
 }
 
 // restart the simulation

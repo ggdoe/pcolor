@@ -46,7 +46,7 @@ int main(int argc, char **argv)
   pcolor_config_fill(&pstate, x, y, w-1, h-1, w-1);
   pstate.show_edge = false;
 
-  pcolor(&pstate, C);
+  pcolor_colorgrid(&pstate, C);
   
   show(pixels, IMG_WIDTH, IMG_HEIGHT);
 

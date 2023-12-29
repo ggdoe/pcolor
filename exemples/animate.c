@@ -39,7 +39,7 @@ void callback_fill_color(void *args)
             ^ cmap_nipy_spectral(0.2 + 0.3 * cos((double)i/8.0 + (double)iter/100.0));
   }
 
-  pcolor(s->pstate, C);
+  pcolor_colorgrid(s->pstate, C);
 
   iter++;
   iter = iter%400;
